@@ -7,4 +7,20 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+# Networking
+mio = { version = "0.8", features = ["os-poll", "net"] }
+binary = { git = "https://github.com/Moulberry/Graphite", rev = "a345e58b" }
+protocol = { git = "https://github.com/Moulberry/Graphite", rev = "a345e58b" }
+io = { path = "../io" }
 
+# UX
+clap = { version = "3.2", features = ["derive"] }
+anyhow = "1"
+log = "0.4"
+env_logger = "0.9"
+
+# Threading
+crossbeam = "0.8"
+
+# Misc
+rand = "0.8"
