@@ -6,6 +6,7 @@ use binary::slice_serialization::SliceSerializable;
 use libdeflater::Decompressor;
 use crate::ctx::{ConnectionContext, GlobalContext};
 use crate::error::CommunicationError;
+use crate::write;
 
 const MIN_PROBE_LEN: usize = 2048;
 
@@ -15,12 +16,12 @@ where
     H: for<'a> FnMut(&RawPacket, &'a mut [u8]) -> &'a mut [u8],
 {
     let GlobalContext { read_buffer, write_buffer, compression_buffer, decompressor, .. } = ctx;
-    let ConnectionContext { compression_threshold, socket, unwritten, unread, .. } = connection;
+    let ConnectionContext { compression_threshold, socket, unwritten, unread, writeable, .. } = connection;
 
     read_buffer.clear();
     write_buffer.clear();
 
-    // SAFETY: this is not really safe but the solution adds a copy
+    // SAFETY: this is not really safe, todo: custom buffer impl
     let write_spare_capacity: &mut [u8] = unsafe {
         mem::transmute(write_buffer.spare_capacity_mut())
     };
@@ -35,7 +36,7 @@ where
             let unused_write_spare_capacity = (handler)(&packet, write_spare_capacity);
             let unused_write_spare_capacity_len = unused_write_spare_capacity.len();
 
-            unwritten.extend_from_slice(&write_spare_capacity[..write_spare_capacity_len-unused_write_spare_capacity_len]);
+            write::write_slice(socket, &write_spare_capacity[..write_spare_capacity_len - unused_write_spare_capacity_len], unwritten, writeable)?;
 
             read += packet.0.len();
         }
@@ -51,11 +52,11 @@ enum ReadResult {
     WouldBlock
 }
 
-fn socket_read<S: Read + Write>(mut socket: S, buffer: &mut Vec<u8>) -> Result<ReadResult, CommunicationError> {
+fn socket_read<S: Read>(mut socket: S, buffer: &mut Vec<u8>) -> Result<ReadResult, CommunicationError> {
     // Make sure there is room in the buffer
     buffer.reserve(MIN_PROBE_LEN);
 
-    // SAFETY: this is not really safe but the solution adds a copy
+    // SAFETY: this is not really safe, todo: custom buffer impl
     let spare_capacity : &mut [u8] = unsafe {
         mem::transmute(buffer.spare_capacity_mut())
     };
@@ -141,7 +142,7 @@ fn handle_compressed_frame<'a>(mut data: &[u8], compression_buffer: &'a mut Vec<
     compression_buffer.clear();
     compression_buffer.reserve(data_len);
 
-    // SAFETY: this is not really safe but the solution requires zeroing
+    // SAFETY: this is not really safe, todo: custom buffer impl
     let spare_capacity = unsafe {
         mem::transmute(compression_buffer.spare_capacity_mut())
     };

@@ -2,7 +2,7 @@ use libdeflater::{CompressionLvl, Compressor, Decompressor};
 use std::io::{Read, Write};
 
 const GLOBAL_BUFFER_CAP: usize = 4096;
-const BOT_BUFFER_CAP: usize = 1024;
+const BOT_BUFFER_CAP: usize = 512;
 
 pub struct ConnectionContext<S: Read + Write> {
     pub(crate) compression_threshold: i32,
