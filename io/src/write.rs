@@ -1,5 +1,5 @@
 use std::io::{ErrorKind, Read, Write};
-use crate::ctx::{ConnectionContext, GlobalContext};
+use crate::ctx::ConnectionContext;
 use crate::error::CommunicationError;
 
 pub fn write<S>(connection: &mut ConnectionContext<S>) -> Result<(), CommunicationError>
@@ -14,7 +14,7 @@ pub fn write<S>(connection: &mut ConnectionContext<S>) -> Result<(), Communicati
     Ok(())
 }
 
-pub fn write_slice<S>(mut socket: S, to_write: &[u8], unwritten: &mut Vec<u8>, writeable: &mut bool) -> Result<(), CommunicationError>
+pub fn write_slice<S>(socket: S, to_write: &[u8], unwritten: &mut Vec<u8>, writeable: &mut bool) -> Result<(), CommunicationError>
     where
         S: Read + Write,
 {
@@ -24,12 +24,11 @@ pub fn write_slice<S>(mut socket: S, to_write: &[u8], unwritten: &mut Vec<u8>, w
     Ok(())
 }
 
-fn write_buf<S>(mut socket: S, to_write: &[u8], writeable: &mut bool) -> Result<usize, CommunicationError>
+fn write_buf<S>(mut socket: S, mut buffer: &[u8], writeable: &mut bool) -> Result<usize, CommunicationError>
     where
         S: Read + Write,
 {
-    if *writeable && !to_write.is_empty() {
-        let mut buffer = &to_write[..];
+    if *writeable && !buffer.is_empty() {
         let mut consume = 0;
         loop {
             match socket_write(&mut socket, buffer)? {

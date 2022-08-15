@@ -36,7 +36,7 @@ where
             let unused_write_spare_capacity = (handler)(&packet, write_spare_capacity);
             let unused_write_spare_capacity_len = unused_write_spare_capacity.len();
 
-            write::write_slice(socket, &write_spare_capacity[..write_spare_capacity_len - unused_write_spare_capacity_len], unwritten, writeable)?;
+            write::write_slice(&mut *socket, &write_spare_capacity[..write_spare_capacity_len - unused_write_spare_capacity_len], unwritten, writeable)?;
 
             read += packet.0.len();
         }
