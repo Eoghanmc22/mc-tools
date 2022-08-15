@@ -1,4 +1,5 @@
 use std::io::{ErrorKind, Read, Write};
+use crate::buf::Buffer;
 use crate::ctx::ConnectionContext;
 use crate::error::CommunicationError;
 
@@ -8,18 +9,31 @@ pub fn write<S>(connection: &mut ConnectionContext<S>) -> Result<(), Communicati
 {
     let ConnectionContext { socket, unwritten, writeable, .. } = connection;
 
-    let consumed = write_buf(socket, &unwritten[..], writeable)?;
-    unwritten.drain(..consumed);
+    if unwritten.is_empty() {
+        return Ok(());
+    }
+
+    let consumed = write_buf(socket, unwritten.get_written(), writeable)?;
+    unwritten.consume(consumed);
 
     Ok(())
 }
 
-pub fn write_slice<S>(socket: S, to_write: &[u8], unwritten: &mut Vec<u8>, writeable: &mut bool) -> Result<(), CommunicationError>
+pub fn write_buffer<S>(socket: S, to_write: &mut Buffer, unwritten: &mut Buffer, writeable: &mut bool) -> Result<(), CommunicationError>
     where
         S: Read + Write,
 {
-    let consumed = write_buf(socket, to_write, writeable)?;
-    unwritten.extend_from_slice(&to_write[consumed..]);
+    if to_write.is_empty() {
+        return Ok(());
+    }
+
+    let written = to_write.get_written();
+    let consumed = write_buf(socket, written, writeable)?;
+    to_write.consume(consumed);
+
+    let remaining = to_write.get_written();
+    unwritten.copy_from(remaining);
+    to_write.reset();
 
     Ok(())
 }
@@ -28,25 +42,25 @@ fn write_buf<S>(mut socket: S, mut buffer: &[u8], writeable: &mut bool) -> Resul
     where
         S: Read + Write,
 {
-    if *writeable && !buffer.is_empty() {
-        let mut consume = 0;
-        loop {
-            match socket_write(&mut socket, buffer)? {
-                WriteResult::Write(new_buffer, consumed) => {
-                    buffer = new_buffer;
-                    consume += consumed;
-                }
-                WriteResult::WouldBlock => {
-                    *writeable = false;
-                    break
-                }
-                WriteResult::Empty => break
-            }
-        }
-        Ok(consume)
-    } else {
-        Ok(0)
+    if !*writeable || buffer.is_empty() {
+        return Ok(0);
     }
+
+    let mut consume = 0;
+    loop {
+        match socket_write(&mut socket, buffer)? {
+            WriteResult::Write(new_buffer, consumed) => {
+                buffer = new_buffer;
+                consume += consumed;
+            }
+            WriteResult::WouldBlock => {
+                *writeable = false;
+                break
+            }
+            WriteResult::Empty => break
+        }
+    }
+    Ok(consume)
 }
 
 enum WriteResult<'a> {
