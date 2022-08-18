@@ -3,12 +3,12 @@ use std::io::{Read, Write};
 use crate::buf::Buffer;
 
 pub struct ConnectionContext<S: Read + Write> {
-    pub(crate) compression_threshold: i32,
-    pub(crate) socket: S,
+    pub compression_threshold: i32,
+    pub socket: S,
     // TODO would smallvec or similar be better?
-    pub(crate) unwritten: Buffer,
-    pub(crate) unread: Buffer,
-    pub(crate) writeable: bool
+    pub unwritten: Buffer,
+    pub unread: Buffer,
+    pub writeable: bool
 }
 
 impl<S: Read + Write> ConnectionContext<S> {
@@ -24,12 +24,12 @@ impl<S: Read + Write> ConnectionContext<S> {
 }
 
 pub struct GlobalContext {
-    pub(crate) read_buffer: Buffer,
-    pub(crate) write_buffer: Buffer,
-    pub(crate) compression_buffer: Buffer,
+    pub read_buffer: Buffer,
+    pub write_buffer: Buffer,
+    pub compression_buffer: Buffer,
 
-    pub(crate) compressor: Compressor,
-    pub(crate) decompressor: Decompressor,
+    pub compressor: Compressor,
+    pub decompressor: Decompressor,
 }
 
 impl GlobalContext {

@@ -23,17 +23,22 @@ pub fn write_buffer<S>(socket: S, to_write: &mut Buffer, unwritten: &mut Buffer,
     where
         S: Read + Write,
 {
+    write_slice(socket, to_write.get_written(), unwritten, writeable)?;
+    to_write.reset();
+    Ok(())
+}
+
+pub fn write_slice<S>(socket: S, mut to_write: &[u8], unwritten: &mut Buffer, writeable: &mut bool) -> Result<(), CommunicationError>
+    where
+        S: Read + Write,
+{
     if to_write.is_empty() {
         return Ok(());
     }
 
-    let written = to_write.get_written();
-    let consumed = write_buf(socket, written, writeable)?;
-    to_write.consume(consumed);
-
-    let remaining = to_write.get_written();
-    unwritten.copy_from(remaining);
-    to_write.reset();
+    let consumed = write_buf(socket, to_write, writeable)?;
+    to_write = &to_write[consumed..];
+    unwritten.copy_from(to_write);
 
     Ok(())
 }
