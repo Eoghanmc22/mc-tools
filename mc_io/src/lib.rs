@@ -1,6 +1,16 @@
-use libdeflater::{CompressionLvl, Compressor, Decompressor};
 use std::io::{Read, Write};
+use libdeflater::{CompressionLvl, Compressor, Decompressor};
 use crate::buf::Buffer;
+
+pub mod error;
+pub mod buf;
+pub mod packet;
+pub mod io;
+
+#[derive(Debug)]
+pub struct FramedPacket<'a>(pub &'a [u8]);
+
+const MAXIMUM_PACKET_SIZE: usize = 2097148;
 
 pub struct ConnectionContext<S: Read + Write> {
     pub compression_threshold: i32,

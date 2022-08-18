@@ -27,4 +27,3 @@ impl<'a> LazyVarint<'a> {
         }
     }
 }
-

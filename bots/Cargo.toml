@@ -11,7 +11,7 @@ edition = "2021"
 mio = { version = "0.8", features = ["os-poll", "net"] }
 binary = { git = "https://github.com/Moulberry/Graphite", rev = "a345e58b" }
 protocol = { git = "https://github.com/Moulberry/Graphite", rev = "a345e58b" }
-io = { path = "../io" }
+mc_io = { path = "../mc_io" }
 
 # UX
 clap = { version = "3.2", features = ["derive"] }

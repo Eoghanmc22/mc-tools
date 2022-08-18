@@ -1,4 +1,4 @@
-// Taken from graphite and simplified for use case
+// Taken from graphite and modified for use case
 
 use std::ptr;
 

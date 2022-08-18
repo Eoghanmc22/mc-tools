@@ -1,15 +1,15 @@
-pub(crate) mod lazy_varint;
-
 use crate::buf::Buffer;
 use crate::error::{ReadError, WriteError};
-use crate::read::FramedPacket;
+use crate::{FramedPacket, MAXIMUM_PACKET_SIZE};
 use binary::slice_serialization::{SliceSerializable, VarInt};
 use libdeflater::{Compressor, Decompressor};
 use protocol::IdentifiedPacket;
 use std::fmt::Debug;
-use crate::compression;
+use crate::packet::lazy_varint::LazyVarint;
 
-use self::lazy_varint::LazyVarint;
+mod compression;
+mod lazy_varint;
+
 
 pub struct WriteContext<'a, 'b> {
     pub compression_threshold: i32,
@@ -17,8 +17,6 @@ pub struct WriteContext<'a, 'b> {
     pub compression_buf: &'a mut Buffer,
     pub compressor: &'b mut Compressor,
 }
-
-const MAXIMUM_PACKET_SIZE: usize = 2097148;
 
 pub fn write_packet<'a, 'b, I: Debug, T>(
     packet: &'a T,
@@ -74,7 +72,7 @@ pub struct ReadContext<'a, 'b> {
 #[derive(Debug)]
 pub struct RawPacket<'a>(pub i32, pub &'a [u8]);
 
-pub fn read_packet<'a>(mut packet: FramedPacket<'a>, ctx: ReadContext<'a, '_>) -> Result<RawPacket<'a>, ReadError> {
+pub fn read_packet<'a>(packet: FramedPacket<'a>, ctx: ReadContext<'a, '_>) -> Result<RawPacket<'a>, ReadError> {
     let ReadContext { compression_threshold, compression_buf, decompressor } = ctx;
 
     let mut buffer = if compression_threshold > 0 {

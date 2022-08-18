@@ -1,6 +1,6 @@
 use std::io::{ErrorKind, Read, Write};
 use crate::buf::Buffer;
-use crate::ctx::ConnectionContext;
+use crate::ConnectionContext;
 use crate::error::CommunicationError;
 
 pub fn write<S>(connection: &mut ConnectionContext<S>) -> Result<(), CommunicationError>

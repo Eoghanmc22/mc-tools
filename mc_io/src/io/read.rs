@@ -1,12 +1,10 @@
 use std::io::{ErrorKind, Read, Write};
 use anyhow::{anyhow, Context};
-use binary::{slice_serialization, varint};
-use binary::slice_serialization::SliceSerializable;
-use libdeflater::Decompressor;
+use binary::varint;
 use crate::buf::Buffer;
-use crate::ctx::{ConnectionContext, GlobalContext};
 use crate::error::CommunicationError;
-use crate::write;
+use crate::{ConnectionContext, FramedPacket, GlobalContext, MAXIMUM_PACKET_SIZE};
+use crate::io::write;
 
 const PROBE_LEN: usize = 2048;
 
@@ -73,11 +71,6 @@ enum DecodeResult<'a> {
     Packet(FramedPacket<'a>, usize),
     Incomplete
 }
-
-#[derive(Debug)]
-pub struct FramedPacket<'a>(pub &'a [u8]);
-
-const MAXIMUM_PACKET_SIZE: usize = 2097148;
 
 fn next_packet(data: &[u8]) -> Result<DecodeResult, CommunicationError> {
     let available = data.len();
