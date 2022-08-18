@@ -4,6 +4,7 @@ pub mod read;
 pub mod write;
 pub mod buf;
 pub mod packet;
+pub mod compression;
 
 #[cfg(test)]
 mod tests {

@@ -1,31 +1,30 @@
-use std::mem;
 use binary::varint;
 
 pub struct LazyVarint<'a> {
-    buffer: &'a mut [u8]
+    buffer: &'a mut [u8],
 }
 
-impl LazyVarint {
-     pub fn write(self, num: i32) {
-         let available = self.buffer.len();
-         let (raw_bytes, len) = varint::encode::i32_raw(num);
-         assert!(available >= len, "Lazy varint buffer is too small");
+impl<'a> LazyVarint<'a> {
+    pub fn new(buffer: &'a mut [u8], max_width: usize) -> (Self, &'a mut [u8]) {
+        let (varint, remaining) = buffer.split_at_mut(max_width);
 
-         self.buffer[..len].copy_from_slice(&raw_bytes[..len]);
+        (Self { buffer: varint }, remaining)
+    }
 
-         if available > len {
-             for byte in len..available - 1 {
-                 self.buffer[byte] = 0b10000000;
-             }
-         }
-     }
-}
+    pub fn write(self, num: i32) {
+        let available = self.buffer.len();
+        let (raw_bytes, len) = varint::encode::i32_raw(num);
+        assert!(available >= len, "Lazy varint buffer is too small");
 
-pub fn lazy_varint<'a>(buffer: &'a mut &'a mut [u8], max_width: usize) -> LazyVarint<'a> {
-    let (varint, remaining) = (*buffer).split_at_mut(max_width);
-    *buffer = remaining;
+        self.buffer[..len].copy_from_slice(&raw_bytes[..len]);
 
-    LazyVarint {
-        buffer: varint
+        if available > len {
+            self.buffer[len - 1] |= 0b10000000;
+            for byte in len..available - 1 {
+                self.buffer[byte] = 0b10000000;
+            }
+            self.buffer[available - 1] = 0b00000000;
+        }
     }
 }
+
