@@ -1,13 +1,13 @@
 pub(crate) mod lazy_varint;
 
 use crate::buf::Buffer;
-use crate::compression::compress;
-use crate::error::WriteError;
-use crate::read::RawPacket;
-use binary::slice_serialization::SliceSerializable;
-use libdeflater::Compressor;
+use crate::error::{ReadError, WriteError};
+use crate::read::FramedPacket;
+use binary::slice_serialization::{SliceSerializable, VarInt};
+use libdeflater::{Compressor, Decompressor};
 use protocol::IdentifiedPacket;
 use std::fmt::Debug;
+use crate::compression;
 
 use self::lazy_varint::LazyVarint;
 
@@ -51,7 +51,7 @@ where
 
     if compression_threshold > 0 {
         if bytes_written >= compression_threshold as usize {
-            Ok(compress(buffer, compression_buf, compressor)?)
+            Ok(compression::compress(buffer, compression_buf, compressor)?)
         } else {
             len1.write(3 + bytes_written as i32);
             len2.write(0);
@@ -65,40 +65,24 @@ where
     }
 }
 
-pub fn read_packet(packet: RawPacket) {}
-
-/*fn handle_uncompressed_frame(data: &[u8]) -> Result<RawPacket, CommunicationError> {
-    Ok(RawPacket(data))
+pub struct ReadContext<'a, 'b> {
+    pub compression_threshold: i32,
+    pub compression_buf: &'a mut Buffer,
+    pub decompressor: &'b mut Decompressor,
 }
 
-fn handle_compressed_frame<'a>(mut data: &'a [u8], compression_buffer: &'a mut Buffer, decompressor: &mut Decompressor, compression_threshold: i32) -> Result<RawPacket<'a>, CommunicationError> {
-    let data_len = slice_serialization::VarInt::read(&mut data).context("data len read")? as usize;
+#[derive(Debug)]
+pub struct RawPacket<'a>(pub i32, pub &'a [u8]);
 
-    // Handle packets too small to be compressed
-    if data_len == 0 {
-        return Ok(RawPacket(data));
-    }
+pub fn read_packet<'a>(mut packet: FramedPacket<'a>, ctx: ReadContext<'a, '_>) -> Result<RawPacket<'a>, ReadError> {
+    let ReadContext { compression_threshold, compression_buf, decompressor } = ctx;
 
-    if data_len > MAXIMUM_PACKET_SIZE {
-        return Err(anyhow!("Uncompressed packet size exceeded limit").into());
-    }
-    if data_len < compression_threshold as usize {
-        return Err(anyhow!("Uncompressed packet size is below compression_threshold").into());
-    }
+    let mut buffer = if compression_threshold > 0 {
+        compression::decompress(packet.0, compression_buf, decompressor, compression_threshold)?
+    } else {
+        packet.0
+    };
 
-    // Decompress the packet
-    compression_buffer.reset();
-    let unwritten = compression_buffer.get_unwritten(data_len);
-    let decompressed = decompressor.zlib_decompress(data, unwritten)?;
-
-    if decompressed != data_len {
-        return Err(anyhow!("Decompressed size {decompressed} is not equal to the size received in header {data_len}").into());
-    }
-
-    // SAFETY: we just put `decompressed` bytes into the buffer
-    unsafe {
-        compression_buffer.advance(decompressed);
-    }
-
-    Ok(RawPacket(compression_buffer.get_written()))
-}*/
+    let packet_id = VarInt::read(&mut buffer).map_err(|_| ReadError::VarInt)?;
+    Ok(RawPacket(packet_id, buffer))
+}

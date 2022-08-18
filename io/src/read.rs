@@ -13,7 +13,7 @@ const PROBE_LEN: usize = 2048;
 pub fn read<S, H>(ctx: &mut GlobalContext, connection: &mut ConnectionContext<S>, mut handler: H) -> Result<(), CommunicationError>
 where
     S: Read + Write,
-    H: FnMut(&RawPacket, &mut Buffer) -> Result<(), CommunicationError>,
+    H: FnMut(&FramedPacket, &mut Buffer) -> Result<(), CommunicationError>,
 {
     let GlobalContext { read_buffer, write_buffer, compression_buffer, decompressor, .. } = ctx;
     let ConnectionContext { compression_threshold, socket, unwritten, unread, writeable, .. } = connection;
@@ -70,12 +70,12 @@ fn socket_read<S: Read>(mut socket: S, buffer: &mut Buffer) -> Result<ReadResult
 }
 
 enum DecodeResult<'a> {
-    Packet(RawPacket<'a>, usize),
+    Packet(FramedPacket<'a>, usize),
     Incomplete
 }
 
 #[derive(Debug)]
-pub struct RawPacket<'a>(pub &'a [u8]);
+pub struct FramedPacket<'a>(pub &'a [u8]);
 
 const MAXIMUM_PACKET_SIZE: usize = 2097148;
 
@@ -94,12 +94,12 @@ fn next_packet(data: &[u8]) -> Result<DecodeResult, CommunicationError> {
             let packet = &data[varint_header_bytes..][..packet_size];
             let network_len = varint_header_bytes + packet_size;
 
-            Ok(DecodeResult::Packet(RawPacket(packet), network_len))
+            Ok(DecodeResult::Packet(FramedPacket(packet), network_len))
         } else {
             Ok(DecodeResult::Incomplete)
         }
     } else if available == 2 && data[0] == 1 {
-        Ok(DecodeResult::Packet(RawPacket(&data[1..2]), 2))
+        Ok(DecodeResult::Packet(FramedPacket(&data[1..2]), 2))
     } else {
         Ok(DecodeResult::Incomplete)
     }
