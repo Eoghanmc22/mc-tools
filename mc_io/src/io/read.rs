@@ -1,9 +1,8 @@
 use std::io::{ErrorKind, Read, Write};
-use anyhow::{anyhow, Context};
 use binary::varint;
 use crate::buf::Buffer;
-use crate::error::CommunicationError;
-use crate::{ConnectionContext, FramedPacket, GlobalContext, MAXIMUM_PACKET_SIZE};
+use crate::error::{CommunicationError, ReadError};
+use crate::{CompressionContext, ConnectionContext, FramedPacket, GlobalContext, MAXIMUM_PACKET_SIZE};
 use crate::io::write;
 
 const PROBE_LEN: usize = 2048;
@@ -11,31 +10,39 @@ const PROBE_LEN: usize = 2048;
 pub fn read<S, H>(ctx: &mut GlobalContext, connection: &mut ConnectionContext<S>, mut handler: H) -> Result<(), CommunicationError>
 where
     S: Read + Write,
-    H: FnMut(&FramedPacket, &mut Buffer) -> Result<(), CommunicationError>,
+    H: FnMut(&FramedPacket, &mut Buffer, CompressionContext) -> Result<(), CommunicationError>,
 {
-    let GlobalContext { read_buffer, write_buffer, compression_buffer, decompressor, .. } = ctx;
-    let ConnectionContext { compression_threshold, socket, unwritten, unread, writeable, .. } = connection;
+    let GlobalContext { read_buf, write_buf, compression_buf, compressor, decompressor} = ctx;
+    let ConnectionContext { compression_threshold, socket, unwritten_buf, unread_buf, writeable } = connection;
 
-    read_buffer.reset();
-    write_buffer.reset();
+    read_buf.reset();
 
     // Restore any bytes that weren't processed previously
-    read_buffer.copy_from(unread.get_written());
-    unread.reset();
+    read_buf.copy_from(unread_buf.get_written());
+    unread_buf.reset();
 
-    while let ReadResult::Read(..) = socket_read(&mut *socket, read_buffer)? {
-        while let DecodeResult::Packet(packet, network_len) = next_packet(read_buffer.get_written())? {
-            (handler)(&packet, write_buffer)?;
+    while let ReadResult::Read(..) = socket_read(&mut *socket, read_buf)? {
+        write_buf.reset();
+        compression_buf.reset();
 
-            read_buffer.consume(network_len);
+        while let DecodeResult::Packet(packet, network_len) = next_packet(read_buf.get_written())? {
+            let compression_ctx = CompressionContext {
+                compression_threshold: *compression_threshold,
+                compression_buf,
+                compressor,
+                decompressor
+            };
+
+            (handler)(&packet, write_buf, compression_ctx)?;
+
+            read_buf.consume(network_len);
         }
 
-        // A write per read seems fair
-        write::write_buffer(&mut *socket, write_buffer, unwritten, writeable)?;
+        write::write_buffer(&mut *socket, write_buf, unwritten_buf, writeable)?;
     }
 
     // Copy any unprocessed bytes into the `unread` buffer for future processing
-    unread.copy_from(read_buffer.get_written());
+    unread_buf.copy_from(read_buf.get_written());
 
     Ok(())
 }
@@ -76,11 +83,11 @@ fn next_packet(data: &[u8]) -> Result<DecodeResult, CommunicationError> {
     let available = data.len();
 
     if available >= 3 {
-        let (packet_size, varint_header_bytes) = varint::decode::u21(data).context("packet len read")?;
+        let (packet_size, varint_header_bytes) = varint::decode::u21(data).map_err(|_| ReadError::VarInt)?;
         let packet_size = packet_size as usize;
 
         if packet_size > MAXIMUM_PACKET_SIZE {
-            return Err(anyhow!("packet size exceeded limit").into());
+            return Err(ReadError::PacketTooLarge.into());
         }
 
         if available >= varint_header_bytes + packet_size {
@@ -93,6 +100,8 @@ fn next_packet(data: &[u8]) -> Result<DecodeResult, CommunicationError> {
         }
     } else if available == 2 && data[0] == 1 {
         Ok(DecodeResult::Packet(FramedPacket(&data[1..2]), 2))
+    } else if available == 1 && data[0] == 0 {
+        Err(ReadError::ZeroSizedPacket.into())
     } else {
         Ok(DecodeResult::Incomplete)
     }

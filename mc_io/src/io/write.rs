@@ -7,7 +7,7 @@ pub fn write<S>(connection: &mut ConnectionContext<S>) -> Result<(), Communicati
     where
         S: Read + Write,
 {
-    let ConnectionContext { socket, unwritten, writeable, .. } = connection;
+    let ConnectionContext { socket, unwritten_buf: unwritten, writeable, .. } = connection;
 
     if unwritten.is_empty() {
         return Ok(());
@@ -83,7 +83,7 @@ fn socket_write<S: Write>(mut socket: S, buffer: &[u8]) -> Result<WriteResult, C
     loop {
         match socket.write(buffer) {
             Ok(0) => return Err(CommunicationError::Closed),
-            Ok(amt) => break Ok(WriteResult::Write(&buffer[..amt], amt)),
+            Ok(amt) => break Ok(WriteResult::Write(&buffer[amt..], amt)),
             Err(ref err) if err.kind() == ErrorKind::WouldBlock => return Ok(WriteResult::WouldBlock),
             Err(ref err) if err.kind() == ErrorKind::Interrupted => continue,
             Err(err) => return Err(CommunicationError::Io(err)),

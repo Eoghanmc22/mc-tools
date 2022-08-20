@@ -116,3 +116,51 @@ impl Default for Buffer {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn copy_from() {
+        let mut buffer = Buffer::new();
+
+        let copy1 = &[0, 1, 2, 3, 4, 5];
+        buffer.copy_from(copy1);
+
+        let copy2 = &[6, 7, 8];
+        buffer.copy_from(copy2);
+
+        let mut expected = Vec::new();
+        expected.extend_from_slice(copy1);
+        expected.extend_from_slice(copy2);
+
+        assert_eq!(buffer.into_written(), expected);
+    }
+
+    #[test]
+    fn consume() {
+        let mut buffer = Buffer::new();
+
+        let data = [5, 4, 3, 2, 1, 0, 1, 2, 3, 4, 5, 6, 7];
+        buffer.copy_from(&data);
+
+        let consumed = 5;
+        buffer.consume(consumed);
+
+        assert_eq!(buffer.into_written(), data[consumed..]);
+    }
+
+    #[test]
+    fn advance() {
+        let mut buffer = Buffer::new();
+
+        let raw_buffer = buffer.get_unwritten(5);
+        raw_buffer.copy_from_slice(&[10; 5]);
+
+        let advanced = unsafe { buffer.advance(5) };
+
+        assert_eq!(advanced, &[10; 5]);
+        assert_eq!(buffer.into_written(), &[10; 5]);
+    }
+}

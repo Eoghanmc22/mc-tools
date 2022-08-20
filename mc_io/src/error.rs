@@ -3,6 +3,7 @@ use libdeflater::{CompressionError, DecompressionError};
 use thiserror::Error;
 
 // todo add backtraces when possible
+// todo split into read and write error better
 #[derive(Error, Debug)]
 pub enum CommunicationError {
     #[error("io with underlying socket failed: {0}")]
@@ -11,8 +12,6 @@ pub enum CommunicationError {
     Closed,
     #[error("Kicked for reason `{0}`")]
     Kicked(String),
-    #[error("Got bad data from peer: {0}")]
-    BadData(#[from] anyhow::Error),
     #[error("Write error: {0}")]
     Write(#[from] WriteError),
     #[error("Read error: {0}")]
@@ -31,6 +30,8 @@ pub enum WriteError {
 pub enum ReadError {
     #[error("Packet size exceeded limit")]
     PacketTooLarge,
+    #[error("Packet with size 0 was received")]
+    ZeroSizedPacket,
     #[error("Decompression error: {0}")]
     Decompression(#[from] DecompressionError),
     #[error("Error reading varint")]

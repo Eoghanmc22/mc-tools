@@ -5,6 +5,9 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[dev-dependencies]
+rand = { version = "0.8", features = ["min_const_gen"] }
+
 [dependencies]
 binary = { git = "https://github.com/Moulberry/Graphite", rev = "a345e58b" }
 protocol = { git = "https://github.com/Moulberry/Graphite", rev = "a345e58b" }
