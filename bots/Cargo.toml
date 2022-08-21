@@ -3,18 +3,22 @@ name = "bots"
 version = "0.1.0"
 authors = ["Eoghanmc22 <eoghanmc@icloud.com>"]
 edition = "2021"
+description = "A tool to stress test minecraft servers"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 # Networking
 mio = { version = "0.8", features = ["os-poll", "net"] }
+mio-misc = "2"
 binary = { git = "https://github.com/Moulberry/Graphite", rev = "a345e58b" }
 protocol = { git = "https://github.com/Moulberry/Graphite", rev = "a345e58b" }
 mc_io = { path = "../mc_io" }
 
 # UX
 clap = { version = "3.2", features = ["derive"] }
+console = "0.15"
+indicatif = "0.17"
 anyhow = "1"
 log = "0.4"
 env_logger = "0.9"
@@ -24,3 +28,4 @@ crossbeam = "0.8"
 
 # Misc
 rand = "0.8"
+euclid = "0.22.7"
