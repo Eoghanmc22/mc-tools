@@ -36,7 +36,13 @@ pub enum ReadError {
     Decompression(#[from] DecompressionError),
     #[error("Error reading varint")]
     VarInt,
-    #[error("A reveived packet was compressed when it shouldn't have been")]
-    BadlyCompressed
+    #[error("A received packet was compressed when it shouldn't have been")]
+    BadlyCompressed,
+    #[error("Received a packet while in an unknown protocol status")]
+    BadProtocolState,
+    #[error("Received a packet with bad id: {0}")]
+    BadPacketID(u8),
+    #[error("Received an unparseable packet: {0}")]
+    BadPacket(anyhow::Error)
 }
 

@@ -10,7 +10,7 @@ const PROBE_LEN: usize = 2048;
 pub fn read<S, H>(ctx: &mut GlobalContext, connection: &mut ConnectionContext<S>, mut handler: H) -> Result<(), CommunicationError>
 where
     S: Read + Write,
-    H: FnMut(&FramedPacket, &mut Buffer, CompressionContext) -> Result<(), CommunicationError>,
+    H: FnMut(&FramedPacket, &mut Buffer, &mut CompressionContext) -> Result<(), CommunicationError>,
 {
     let GlobalContext { read_buf, write_buf, compression_buf, compressor, decompressor} = ctx;
     let ConnectionContext { compression_threshold, socket, unwritten_buf, unread_buf, writeable } = connection;
@@ -26,14 +26,14 @@ where
         compression_buf.reset();
 
         while let DecodeResult::Packet(packet, network_len) = next_packet(read_buf.get_written())? {
-            let compression_ctx = CompressionContext {
+            let mut compression_ctx = CompressionContext {
                 compression_threshold: *compression_threshold,
                 compression_buf,
                 compressor,
                 decompressor
             };
 
-            (handler)(&packet, write_buf, compression_ctx)?;
+            (handler)(&packet, write_buf, &mut compression_ctx)?;
 
             read_buf.consume(network_len);
         }

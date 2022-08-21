@@ -121,7 +121,7 @@ where
     Ok(())
 }
 
-pub fn read_packet<'a>(packet: FramedPacket<'a>, ctx: &'a mut CompressionContext<'a, '_, '_>) -> Result<RawPacket<'a>, ReadError> {
+pub fn read_packet<'a>(packet: &'a FramedPacket, ctx: &'a mut CompressionContext) -> Result<RawPacket<'a>, ReadError> {
     let CompressionContext {
         compression_threshold,
         compression_buf,
@@ -136,5 +136,5 @@ pub fn read_packet<'a>(packet: FramedPacket<'a>, ctx: &'a mut CompressionContext
     };
 
     let packet_id = VarInt::read(&mut buffer).map_err(|_| ReadError::VarInt)?;
-    Ok(RawPacket(packet_id, buffer))
+    Ok(RawPacket(packet_id as u8, buffer))
 }
