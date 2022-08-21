@@ -66,8 +66,8 @@ fn create_packet_meta<'a>(packet_buf: &'a mut Buffer, compression_buf: &'a mut B
 
 pub fn write_packet<'a, 'b, I: Debug, T>(
     packet: &'a T,
-    packet_buf: &'b mut Buffer,
-    ctx: &'b mut CompressionContext<'b, '_, '_>,
+    packet_buf: &mut Buffer,
+    ctx: &mut CompressionContext,
 ) -> Result<(), WriteError>
 where
     T: SliceSerializable<'a, T> + IdentifiedPacket<I> + 'a,
@@ -78,6 +78,7 @@ where
         compressor,
         ..
     } = ctx;
+    compression_buf.reset();
 
     let expected_packet_size = T::get_write_size(T::maybe_deref(packet));
     if expected_packet_size > MAXIMUM_PACKET_SIZE {

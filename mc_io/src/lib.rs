@@ -1,6 +1,8 @@
 use std::io::{Read, Write};
 use libdeflater::{CompressionLvl, Compressor, Decompressor};
 use crate::buf::Buffer;
+use crate::error::CommunicationError;
+use crate::io::write;
 
 pub mod error;
 pub mod buf;
@@ -35,6 +37,14 @@ impl<S: Read + Write> ConnectionContext<S> {
             writeable: false
         }
     }
+
+    pub fn write_buffer(&mut self, to_write: &mut Buffer) -> Result<(), CommunicationError> {
+        write::write_buffer(&mut self.socket, to_write, &mut self.unwritten_buf, &mut self.writeable)
+    }
+
+    pub fn write_slice(&mut self, to_write: &[u8]) -> Result<(), CommunicationError> {
+        write::write_slice(&mut self.socket, to_write, &mut self.unwritten_buf, &mut self.writeable)
+    }
 }
 
 pub struct GlobalContext {
@@ -55,6 +65,25 @@ impl GlobalContext {
             compressor: Compressor::new(CompressionLvl::fastest()),
             decompressor: Decompressor::new(),
         }
+    }
+
+    pub fn compression<S: Read + Write>(&mut self, connection: &ConnectionContext<S>) -> (&mut Buffer, CompressionContext) {
+        self.reset();
+        (
+            &mut self.write_buf,
+            CompressionContext {
+                compression_threshold: connection.compression_threshold,
+                compression_buf: &mut self.compression_buf,
+                compressor: &mut self.compressor,
+                decompressor: &mut self.decompressor
+            }
+        )
+    }
+
+    pub fn reset(&mut self) {
+        self.read_buf.reset();
+        self.write_buf.reset();
+        self.compression_buf.reset();
     }
 }
 

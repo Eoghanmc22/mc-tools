@@ -8,6 +8,7 @@ pub fn write<S>(connection: &mut ConnectionContext<S>) -> Result<(), Communicati
         S: Read + Write,
 {
     let ConnectionContext { socket, unwritten_buf: unwritten, writeable, .. } = connection;
+    *writeable = true;
 
     if unwritten.is_empty() {
         return Ok(());
