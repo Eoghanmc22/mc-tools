@@ -17,6 +17,7 @@ pub fn compress<'a>(src: &[u8], dst: &'a mut Buffer, compressor: &mut Compressor
     data_len.write(src.len() as i32);
     total_len.write(3 + compressed as i32);
 
+    // SAFETY: We initialized 2 byte length headers and `compressed` bytes of data
     Ok(unsafe { dst.advance(3 + 3 + compressed) })
 }
 
@@ -40,6 +41,7 @@ pub fn decompress<'a>(mut src: &[u8], dst: &'a mut Buffer, decompressor: &mut De
         return Err(ReadError::BadlyCompressed);
     }
 
+    // SAFETY: The decompressor wrote `decompressed` bytes
     Ok(unsafe { dst.advance(decompressed) })
 }
 
