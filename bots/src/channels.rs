@@ -6,5 +6,5 @@ pub enum ConsoleMessage {
 }
 
 pub enum BotMessage {
-    ConnectBot()
+    ConnectBot(String)
 }

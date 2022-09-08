@@ -1,8 +1,6 @@
-use std::io::{Read, Write};
 use euclid::default::*;
-use mc_io::ConnectionContext;
 
-pub struct Player<S: Read + Write> {
+pub struct Player {
     pub entity_id: i32,
     pub proto_state: u8,
     pub username: String,
@@ -12,7 +10,5 @@ pub struct Player<S: Read + Write> {
     pub kicked: bool,
 
     pub position: Point3D<f64>,
-    pub velocity: Point3D<f64>,
-
-    pub connection: ConnectionContext<S>
+    pub velocity: Vector3D<f64>,
 }
