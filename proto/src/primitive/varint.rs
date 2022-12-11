@@ -5,7 +5,7 @@ const CONTINUE_BIT: u8 = !SEGMENT_BITS;
 const REMAINING_MASK: u64 = !(SEGMENT_BITS as u64);
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
-pub struct VarNum<const WIDTH: usize>(pub i64);
+pub struct VarNum<const WIDTH: usize>(pub u64);
 
 // TODO fast impl
 impl<'a, const WIDTH: usize> Data<'a> for VarNum<WIDTH> {
@@ -16,7 +16,7 @@ impl<'a, const WIDTH: usize> Data<'a> for VarNum<WIDTH> {
             let next_byte = u8::try_decode(buffer)?;
             let offset = position * 7;
 
-            val |= ((next_byte & SEGMENT_BITS) as i64) << offset;
+            val |= ((next_byte & SEGMENT_BITS) as u64) << offset;
 
             if next_byte & CONTINUE_BIT == 0 {
                 return Ok(Self(val));
@@ -32,7 +32,7 @@ impl<'a, const WIDTH: usize> Data<'a> for VarNum<WIDTH> {
     }
 
     fn encode<'b>(&self, mut buffer: &'b mut [u8]) -> &'b mut [u8] {
-        let val = self.0 as u64;
+        let val = self.0;
 
         for position in 0..WIDTH {
             let val = val >> position * 7;
@@ -60,14 +60,35 @@ pub type VarInt = VarNum<5>;
 pub type VarLong = VarNum<10>;
 
 pub fn v21(num: u32) -> V21 {
-    VarNum(num as i64)
+    VarNum(num as u64)
 }
 pub fn var_int(num: i32) -> VarInt {
-    VarNum(num as u32 as i64)
+    VarNum(num as u32 as u64)
 }
 pub fn var_long(num: i64) -> VarLong {
-    VarNum(num as i64)
+    VarNum(num as u64)
 }
+
+macro_rules! convert_impl {
+    ($other: ty, $intermediate: ty) => {
+        impl<const WIDTH: usize> From<$other> for VarNum<WIDTH> {
+            fn from(other: $other) -> Self {
+                Self(other as $intermediate as u64)
+            }
+        }
+
+        impl<const WIDTH: usize> From<VarNum<WIDTH>> for $other {
+            fn from(var_num: VarNum<WIDTH>) -> Self {
+                var_num.0 as $other
+            }
+        }
+    };
+}
+
+convert_impl!(u32, u32);
+convert_impl!(i32, u32);
+convert_impl!(u64, u64);
+convert_impl!(i64, u64);
 
 #[cfg(test)]
 mod tests {

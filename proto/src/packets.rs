@@ -2,40 +2,60 @@
 // TODO Packet trait
 
 pub mod handshake {
-    use crate::{primitive::varint::var_int, Data, DecodingError};
+    use crate::{
+        define_packet, primitive::varint::var_int, primitive::varint::VarInt, Data, DecodingError,
+        Direction, Packet,
+    };
 
-    pub struct Handshake<'a> {
-        protocol_version: u32,
-        server_address: &'a str,
-        server_port: u16,
-        next_state: u32,
-    }
-
-    impl<'a> Data<'a> for Handshake<'a> {
-        fn try_decode<'b: 'a>(_buffer: &'a mut &'b [u8]) -> Result<Self, DecodingError> {
-            todo!()
-        }
-
-        fn expected_size(&self) -> usize {
-            let mut len = 1;
-
-            len += self.protocol_version.expected_size();
-            len += self.server_address.expected_size();
-            len += self.server_port.expected_size();
-            len += self.next_state.expected_size();
-
-            len
-        }
-
-        fn encode<'b>(&self, buffer: &'b mut [u8]) -> &'b mut [u8] {
-            let buffer = var_int(0x00).encode(buffer);
-            let buffer = self.protocol_version.encode(buffer);
-            let buffer = self.server_address.encode(buffer);
-            let buffer = self.server_port.encode(buffer);
-            let buffer = self.next_state.encode(buffer);
-            buffer
+    define_packet! {
+        pub struct Handshake<'a> {
+            pub protocol_version: u32 as VarInt,
+            pub server_address: &'a str,
+            pub server_port: u16,
+            pub next_state: u8
         }
     }
+
+    impl<'a> Packet<'a> for Handshake<'a>
+    where
+        Handshake<'a>: Data<'a>,
+    {
+        const PACKET_ID: u8 = 0x00;
+
+        const DIRECTION: Direction = Direction::ClientToServer;
+    }
+
+    // impl<'a> Data<'a> for Handshake<'a> {
+    //     fn try_decode<'b: 'a>(buffer: &'a mut &'b [u8]) -> Result<Self, DecodingError> {
+    //         // Ok(Handshake {
+    //         //     protocol_version: Data::try_decode(buffer)?,
+    //         //     server_address: Data::try_decode(buffer)?,
+    //         //     server_port: Data::try_decode(buffer)?,
+    //         //     next_state: Data::try_decode(buffer)?,
+    //         // })
+    //         todo!()
+    //     }
+    //
+    //     fn expected_size(&self) -> usize {
+    //         let mut len = 1;
+    //
+    //         len += self.protocol_version.expected_size();
+    //         len += self.server_address.expected_size();
+    //         len += self.server_port.expected_size();
+    //         len += self.next_state.expected_size();
+    //
+    //         len
+    //     }
+    //
+    //     fn encode<'b>(&self, buffer: &'b mut [u8]) -> &'b mut [u8] {
+    //         let buffer = var_int(0x00).encode(buffer);
+    //         let buffer = self.protocol_version.encode(buffer);
+    //         let buffer = self.server_address.encode(buffer);
+    //         let buffer = self.server_port.encode(buffer);
+    //         let buffer = self.next_state.encode(buffer);
+    //         buffer
+    //     }
+    // }
 }
 
 pub mod login {
