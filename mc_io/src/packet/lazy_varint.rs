@@ -1,5 +1,5 @@
-use std::mem;
 use binary::varint;
+use std::mem;
 
 pub struct LazyVarint<'a> {
     buffer: &'a mut [u8],
@@ -17,7 +17,11 @@ impl<'a> LazyVarint<'a> {
     pub fn write(self, num: i32) {
         let available = self.buffer.len();
         let (raw_bytes, len) = varint::encode::i32_raw(num);
-        assert!(available >= len, "Lazy varint buffer is too small, available: {available}, len: {len}, num: {num}");
+
+        debug_assert!(
+            available >= len,
+            "Lazy varint buffer is too small, available: {available}, len: {len}, num: {num}"
+        );
 
         self.buffer[..len].copy_from_slice(&raw_bytes[..len]);
 
@@ -33,10 +37,10 @@ impl<'a> LazyVarint<'a> {
 
 #[cfg(test)]
 mod tests {
-    use std::mem;
-    use binary::slice_serialization::{SliceSerializable, VarInt};
-    use crate::Buffer;
     use super::*;
+    use crate::Buffer;
+    use binary::slice_serialization::{SliceSerializable, VarInt};
+    use std::mem;
 
     #[test]
     fn varint_roundtrip() {
@@ -48,7 +52,6 @@ mod tests {
         do_varint_roundtrip(100000, 5);
         do_varint_roundtrip(10000000, 5);
         do_varint_roundtrip(-100, 5);
-        do_varint_roundtrip(-100000, 5);
         do_varint_roundtrip(-100000, 5);
         do_varint_roundtrip(-10000000, 5);
     }

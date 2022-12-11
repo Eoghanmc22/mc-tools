@@ -10,9 +10,6 @@ description = "A tool to stress test minecraft servers"
 [dependencies]
 # Networking
 mio = { version = "0.8", features = ["os-poll", "net"] }
-mio-misc = "2"
-binary = { git = "https://github.com/Moulberry/Graphite", rev = "a345e58b" }
-protocol = { git = "https://github.com/Moulberry/Graphite", rev = "a345e58b" }
 mc_io = { path = "../mc_io" }
 
 # UX
