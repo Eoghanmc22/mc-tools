@@ -9,7 +9,7 @@ pub struct VarNum<const WIDTH: usize>(pub u64);
 
 // TODO fast impl
 impl<'a, const WIDTH: usize> Data<'a> for VarNum<WIDTH> {
-    fn try_decode<'b: 'a>(buffer: &'a mut &'b [u8]) -> Result<Self, DecodingError> {
+    fn try_decode(buffer: &mut &'a [u8]) -> Result<Self, DecodingError> {
         let mut val = 0;
 
         for position in 0..WIDTH {

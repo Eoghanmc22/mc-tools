@@ -3,12 +3,12 @@ pub mod varint;
 use crate::{Data, DecodingError};
 use std::mem;
 
-use self::varint::{var_int, VarInt};
+pub use self::varint::*;
 
 macro_rules! impl_data_primitive {
     ($ty:ty, $bits:expr) => {
         impl<'a> Data<'a> for $ty {
-            fn try_decode<'b: 'a>(buffer: &'a mut &'b [u8]) -> Result<Self, DecodingError> {
+            fn try_decode(buffer: &mut &'a [u8]) -> Result<Self, DecodingError> {
                 if buffer.len() < mem::size_of::<Self>() {
                     return Err(DecodingError::EOF);
                 }
@@ -48,7 +48,6 @@ impl_data_primitive!(u128);
 impl_data_primitive!(f32, 32);
 impl_data_primitive!(f64, 64);
 
-// String
 // Chat
 // Identifier
 // varint
@@ -62,7 +61,7 @@ impl_data_primitive!(f64, 64);
 // enums
 
 impl<'a> Data<'a> for bool {
-    fn try_decode<'b: 'a>(buffer: &'a mut &'b [u8]) -> Result<Self, DecodingError> {
+    fn try_decode(buffer: &mut &'a [u8]) -> Result<Self, DecodingError> {
         let byte = u8::try_decode(buffer)?;
         Ok(byte != 0)
     }
@@ -80,7 +79,7 @@ impl<'a, D> Data<'a> for Option<D>
 where
     D: Data<'a>,
 {
-    fn try_decode<'b: 'a>(buffer: &'a mut &'b [u8]) -> Result<Self, DecodingError> {
+    fn try_decode(buffer: &mut &'a [u8]) -> Result<Self, DecodingError> {
         let present = bool::try_decode(buffer)?;
         if present {
             Ok(Some(D::try_decode(buffer)?))
@@ -108,7 +107,7 @@ where
 }
 
 impl<'a> Data<'a> for &'a [u8] {
-    fn try_decode<'b: 'a>(buffer: &'a mut &'b [u8]) -> Result<Self, DecodingError> {
+    fn try_decode(buffer: &mut &'a [u8]) -> Result<Self, DecodingError> {
         let len = VarInt::try_decode(buffer)?.0 as usize;
 
         if buffer.len() < len {
@@ -135,7 +134,7 @@ impl<'a> Data<'a> for &'a [u8] {
 }
 
 impl<'a> Data<'a> for &'a str {
-    fn try_decode<'b: 'a>(buffer: &'a mut &'b [u8]) -> Result<Self, DecodingError> {
+    fn try_decode(buffer: &mut &'a [u8]) -> Result<Self, DecodingError> {
         let data = <&[u8]>::try_decode(buffer)?;
         core::str::from_utf8(data).map_err(|_| DecodingError::BadData)
     }
