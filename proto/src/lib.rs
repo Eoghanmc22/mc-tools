@@ -48,7 +48,7 @@ macro_rules! define_proto {
         }
 
         $(
-            impl<'a> $crate::Packet< $( $life, )? $proto_name> for $packet $( <$life> )? {
+            impl<'a> $crate::Packet<'a, $proto_name> for $packet $( <$life> )? {
                 const PACKET_ID: $proto_name = $proto_name::$packet;
                 const PACKET_ID_NUM: u8 = $packet_id;
                 const DIRECTION: $crate::Direction = $dir;
@@ -97,7 +97,7 @@ macro_rules! define_proto {
 #[macro_export]
 macro_rules! define_data {
     (pub struct $packet:ident $( < $life:lifetime > )? { $( pub $field_name:ident : $field_type:ty $( as $field_net_type:ty )? ),* }) => {
-        #[derive(Clone, Eq, PartialEq, Debug)]
+        #[derive(Clone, PartialEq, Debug)]
         pub struct $packet $( < $life > )? {
             $(
                 pub $field_name : $field_type,

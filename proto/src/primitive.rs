@@ -147,3 +147,69 @@ impl<'a> Data<'a> for &'a str {
         self.as_bytes().encode(buffer)
     }
 }
+
+pub struct Remaining<'a>(&'a [u8]);
+
+impl<'a> Data<'a> for Remaining<'a> {
+    fn try_decode(buffer: &mut &'a [u8]) -> Result<Self, DecodingError> {
+        Ok(Self(mem::take(buffer)))
+    }
+
+    fn expected_size(&self) -> usize {
+        self.0.len()
+    }
+
+    fn encode<'b>(&self, buffer: &'b mut [u8]) -> &'b mut [u8] {
+        buffer[..self.0.len()].copy_from_slice(self.0);
+        &mut buffer[self.0.len()..]
+    }
+}
+
+impl<'a> From<&'a [u8]> for Remaining<'a> {
+    fn from(value: &'a [u8]) -> Self {
+        Self(value)
+    }
+}
+
+impl<'a> From<Remaining<'a>> for &'a [u8] {
+    fn from(value: Remaining<'a>) -> Self {
+        value.0
+    }
+}
+
+impl<'a, D> Data<'a> for Vec<D>
+where
+    D: Data<'a>,
+{
+    fn try_decode(buffer: &mut &'a [u8]) -> Result<Self, DecodingError> {
+        let len = VarInt::try_decode(buffer)?.0 as usize;
+        let mut vec = if len <= buffer.len() {
+            Vec::with_capacity(len)
+        } else {
+            return Err(DecodingError::BadData);
+        };
+
+        for _ in 0..len {
+            vec.push(D::try_decode(buffer)?);
+        }
+
+        Ok(vec)
+    }
+
+    fn expected_size(&self) -> usize {
+        var_int(self.len() as i32).expected_size()
+            + self.iter().map(|it| it.expected_size()).sum::<usize>()
+    }
+
+    fn encode<'b>(&self, buffer: &'b mut [u8]) -> &'b mut [u8] {
+        let len = var_int(self.len() as i32);
+
+        let mut buffer = len.encode(buffer);
+
+        for it in self {
+            buffer = it.encode(buffer);
+        }
+
+        buffer
+    }
+}
