@@ -2,7 +2,7 @@ pub mod handshake {
     use crate::{define_data, define_proto, primitive::VarInt, Direction};
 
     define_proto! {
-        HandshakeState, 0, Direction::ClientToServer => {
+        HandshakeProtoC2S, 0, Direction::ClientToServer => {
            HandshakePacket<'a> = 0x00
         }
     }
@@ -21,7 +21,7 @@ pub mod login {
     use crate::{define_data, define_proto, primitive::Remaining, primitive::VarInt, Direction};
 
     define_proto! {
-        LoginState, 2, Direction::ClientToServer => {
+        LoginProtoC2S, 2, Direction::ClientToServer => {
             LoginStartPacket<'a> = 0x00,
             EncryptionResponsePacket<'a> = 0x01,
             LoginPluginResponsePacket<'a> = 0x02
@@ -55,7 +55,7 @@ pub mod play {
     use crate::{define_data, define_proto, primitive::VarInt, Direction};
 
     define_proto! {
-        PlayState, 3, Direction::ClientToServer => {
+        PlayProtoC2S, 3, Direction::ClientToServer => {
             TeleportConfirmPacket = 0x00,
             ChatMesssagePacket<'a> = 0x05,
             ClientSettingsPacket<'a> = 0x08,

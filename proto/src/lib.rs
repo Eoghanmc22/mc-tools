@@ -62,30 +62,30 @@ macro_rules! define_proto {
                         Ok(())
                     }
                 )*
-            }
 
-            fn parse_and_handle(&mut self, mut bytes: &[u8]) -> Result<(), E> {
-                let packet_id_byte: u8 = $crate::Data::try_decode(&mut bytes)?;
+                fn [< parse_and_handle_ $proto_name:snake >] (&mut self, mut bytes: &[u8]) -> Result<(), E> {
+                    let packet_id_byte: u8 = $crate::Data::try_decode(&mut bytes)?;
 
-                if let Ok(packet_id) = $proto_name::try_from(packet_id_byte) {
-                    match packet_id {
-                        $(
-                            $proto_name::$packet => {
-                                let packet = <$packet as $crate::Data>::try_decode(&mut bytes)?;
+                    if let Ok(packet_id) = $proto_name::try_from(packet_id_byte) {
+                        match packet_id {
+                            $(
+                                $proto_name::$packet => {
+                                    let packet = <$packet as $crate::Data>::try_decode(&mut bytes)?;
 
-                                if !bytes.is_empty() {
-                                    return Err($crate::DecodingError::DirtyBuffer(format!("{:?}", packet_id)).into())?
+                                    if !bytes.is_empty() {
+                                        return Err($crate::DecodingError::DirtyBuffer(format!("{:?}", packet_id)).into())?
+                                    }
+
+                                    paste::paste! {
+                                        Ok(self.[<handle_ $packet:snake>](packet)?)
+                                    }
                                 }
-
-                                paste::paste! {
-                                    Ok(self.[<handle_ $packet:snake>](packet)?)
-                                }
-                            }
-                        )*
+                            )*
+                        }
+                    } else {
+                        // Ignore unknown packets
+                        Ok(())
                     }
-                } else {
-                    // Ignore unknown packets
-                    Ok(())
                 }
             }
         }

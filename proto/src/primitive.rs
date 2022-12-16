@@ -148,6 +148,7 @@ impl<'a> Data<'a> for &'a str {
     }
 }
 
+#[derive(Clone, PartialEq, Debug)]
 pub struct Remaining<'a>(&'a [u8]);
 
 impl<'a> Data<'a> for Remaining<'a> {
