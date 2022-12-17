@@ -3,36 +3,52 @@ use proto::Data;
 
 use crate::buf::Buffer;
 use crate::error::{CommunicationError, ReadError};
-use crate::io::write;
 use crate::{
-    CompressionContext, ConnectionContext, FramedPacket, GlobalContext, MAXIMUM_PACKET_SIZE,
+    CompressionReadContext, ConnectionReadContext, FramedPacket, GlobalReadContext,
+    MAXIMUM_PACKET_SIZE,
 };
 use std::io::{ErrorKind, Read, Write};
 
 const PROBE_LEN: usize = 2048;
 
-pub fn read<S, H>(
-    ctx: &mut GlobalContext,
-    connection: &mut ConnectionContext<S>,
-    mut handler: H,
+pub trait ReadHandler {
+    fn handle(
+        &mut self,
+        packet: &FramedPacket,
+        compression_ctx: CompressionReadContext,
+    ) -> Result<(), CommunicationError>;
+}
+
+impl<F> ReadHandler for F
+where
+    F: FnMut(&FramedPacket, CompressionReadContext) -> Result<(), CommunicationError>,
+{
+    fn handle(
+        &mut self,
+        packet: &FramedPacket,
+        compression_ctx: CompressionReadContext,
+    ) -> Result<(), CommunicationError> {
+        (self)(packet, compression_ctx)
+    }
+}
+
+pub fn read<S>(
+    ctx: &mut GlobalReadContext,
+    connection: &mut ConnectionReadContext<S>,
+    mut handler: impl ReadHandler,
 ) -> Result<(), CommunicationError>
 where
     S: Read + Write,
-    H: FnMut(&FramedPacket, &mut Buffer, &mut CompressionContext) -> Result<(), CommunicationError>,
 {
-    let GlobalContext {
+    let GlobalReadContext {
         read_buf,
-        write_buf,
         compression_buf,
-        compressor,
         decompressor,
     } = ctx;
-    let ConnectionContext {
+    let ConnectionReadContext {
         compression_threshold,
         socket,
-        unwritten_buf,
         unread_buf,
-        writeable,
     } = connection;
 
     read_buf.reset();
@@ -42,23 +58,19 @@ where
     unread_buf.reset();
 
     while let ReadResult::Read(..) = socket_read(&mut *socket, read_buf)? {
-        write_buf.reset();
         compression_buf.reset();
 
         while let DecodeResult::Packet(packet, network_len) = next_packet(read_buf.get_written())? {
-            let mut compression_ctx = CompressionContext {
+            let compression_ctx = CompressionReadContext {
                 compression_threshold: *compression_threshold,
                 compression_buf,
-                compressor,
                 decompressor,
             };
 
-            (handler)(&packet, write_buf, &mut compression_ctx)?;
+            handler.handle(&packet, compression_ctx)?;
 
             read_buf.consume(network_len);
         }
-
-        write::write_buffer(&mut *socket, write_buf, unwritten_buf, writeable)?;
     }
 
     // Copy any unprocessed bytes into the `unread` buffer for future processing

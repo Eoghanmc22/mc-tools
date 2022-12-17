@@ -1,30 +1,32 @@
-use std::collections::HashMap;
-use std::io::{Read, Write};
-use std::net::SocketAddr;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::time::Duration;
+use crate::channels::ConsoleMessage;
+use crate::player::Player;
+use crate::{address::MinecraftAddress, channels::BotMessage, Args};
 use anyhow::Context;
+use binary::slice_serialization::SliceSerializable;
 use crossbeam::channel::{Receiver, Sender};
+use euclid::Vector3D;
 use log::{error, warn};
 use mc_io::buf::Buffer;
-use crate::{Args, address::MinecraftAddress, channels::BotMessage};
-use mio::{Interest, Token, Waker};
+use mc_io::error::{CommunicationError, ReadError};
+use mc_io::io::{read, write};
+use mc_io::{
+    packet, CompressionContext, ConnectionContext, FramedPacket, GlobalContext, RawPacket,
+};
 use mio::net::TcpStream;
-use mio_misc::{channel, NotificationId};
+use mio::{Interest, Token, Waker};
 use mio_misc::channel::CrossbeamSender;
 use mio_misc::poll::Poll;
 use mio_misc::queue::{BoundedNotificationQueue, NotificationReceiver};
 use mio_misc::scheduler::{NotificationScheduler, Scheduler};
-use mc_io::error::{CommunicationError, ReadError};
-use mc_io::{GlobalContext, packet, FramedPacket, CompressionContext, RawPacket, ConnectionContext};
-use crate::channels::ConsoleMessage;
-use crate::player::Player;
-use protocol::*;
-use binary::slice_serialization::SliceSerializable;
-use euclid::Vector3D;
+use mio_misc::{channel, NotificationId};
 use protocol::types::{ArmPosition, ChatVisibility};
-use mc_io::io::{read, write};
+use protocol::*;
+use std::collections::HashMap;
+use std::io::{Read, Write};
+use std::net::SocketAddr;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+use std::time::Duration;
 
 const PROTOCOL_VERSION: i32 = 759;
 
@@ -52,8 +54,17 @@ pub struct BotContext {
     tick_id: NotificationId,
 }
 
-pub fn setup_bot(args: Args, to_console: Sender<ConsoleMessage>, scheduler: Arc<Scheduler>) -> anyhow::Result<(Bot, BotContext)> {
-    let Args { server: MinecraftAddress(server), radius, speed, .. } = args;
+pub fn setup_bot(
+    args: Args,
+    to_console: Sender<ConsoleMessage>,
+    scheduler: Arc<Scheduler>,
+) -> anyhow::Result<(Bot, BotContext)> {
+    let Args {
+        server: MinecraftAddress(server),
+        radius,
+        speed,
+        ..
+    } = args;
 
     let poll = Poll::with_capacity(100).context("Create poll")?;
 
@@ -64,20 +75,18 @@ pub fn setup_bot(args: Args, to_console: Sender<ConsoleMessage>, scheduler: Arc<
     let queue = Arc::new(queue);
 
     let from_console_id = NotificationId::gen_next();
-    let (to_bot, from_console) = channel::crossbeam_channel_bounded(queue.clone(), from_console_id, 100);
+    let (to_bot, from_console) =
+        channel::crossbeam_channel_bounded(queue.clone(), from_console_id, 100);
 
     let tick_id = NotificationId::gen_next();
-    NotificationScheduler::new(queue.clone(), scheduler.clone())
-        .notify_with_fixed_interval(
-            tick_id,
-            TICK_DURATION,
-            None,
-            Some("Tick Scheduler".to_owned())
-        );
+    NotificationScheduler::new(queue.clone(), scheduler.clone()).notify_with_fixed_interval(
+        tick_id,
+        TICK_DURATION,
+        None,
+        Some("Tick Scheduler".to_owned()),
+    );
 
-    let bot = Bot {
-        to_bot,
-    };
+    let bot = Bot { to_bot };
 
     let ctx = BotContext {
         server,
@@ -88,7 +97,7 @@ pub fn setup_bot(args: Args, to_console: Sender<ConsoleMessage>, scheduler: Arc<
         to_console,
         from_console,
         from_console_id,
-        tick_id
+        tick_id,
     };
 
     Ok((bot, ctx))
@@ -108,7 +117,7 @@ pub fn start(ctx: BotContext) {
         from_console,
 
         from_console_id,
-        tick_id
+        tick_id,
     } = ctx;
 
     let mut global_ctx = GlobalContext::new();
@@ -129,13 +138,16 @@ pub fn start(ctx: BotContext) {
                                         let mut stream = match TcpStream::connect(server) {
                                             Ok(stream) => stream,
                                             Err(error) => {
-                                                error!("Bot `{username}` could not connect: {error}");
-                                                continue
+                                                error!(
+                                                    "Bot `{username}` could not connect: {error}"
+                                                );
+                                                continue;
                                             }
                                         };
-                                        let token = Token(NEXT_TOKEN.fetch_and(1, Ordering::Relaxed));
+                                        let token =
+                                            Token(NEXT_TOKEN.fetch_and(1, Ordering::Relaxed));
                                         //poll.registry()
-                                            //.register(&mut stream, token, Interest::READABLE | Interest::WRITABLE).expect("Register");
+                                        //.register(&mut stream, token, Interest::READABLE | Interest::WRITABLE).expect("Register");
                                         let player = Player {
                                             entity_id: -1,
                                             proto_state: 2,
@@ -149,7 +161,7 @@ pub fn start(ctx: BotContext) {
                                                 y: 0.0,
                                                 z: rand::random(),
                                                 ..Default::default()
-                                            } * speed
+                                            } * speed,
                                         };
                                         let connection = ConnectionContext::new(stream);
 
@@ -173,13 +185,14 @@ pub fn start(ctx: BotContext) {
                                     player.velocity.z = -player.velocity.z;
                                 }
 
-                                let (write_buffer, mut compression_ctx) = global_ctx.compression(connection);
+                                let (write_buffer, mut compression_ctx) =
+                                    global_ctx.compression(connection);
                                 // TODO: Send a variety of move packets
                                 let move_packet = play::client::MovePlayerPos {
                                     x: player.position.x,
                                     y: player.position.y,
                                     z: player.position.z,
-                                    on_ground: false
+                                    on_ground: false,
                                 };
 
                                 // TODO: Implement random actions
@@ -194,6 +207,8 @@ pub fn start(ctx: BotContext) {
                         // Set up the player if needed
                         if event.is_writable() && !player.connected && !player.kicked {
                             let result = || -> Result<(), CommunicationError> {
+                                // FIXME check TcpStream::peer_addr() for errors before actually
+                                // labaling the connection as connected
                                 connection.socket.set_nodelay(true)?;
 
                                 let handshake = handshake::client::Intention {
@@ -209,7 +224,8 @@ pub fn start(ctx: BotContext) {
                                     uuid: None,
                                 };
 
-                                let (buffer, mut compression_ctx) = global_ctx.compression(&connection);
+                                let (buffer, mut compression_ctx) =
+                                    global_ctx.compression(&connection);
                                 packet::write_packet(&handshake, buffer, &mut compression_ctx)?;
                                 packet::write_packet(&login_start, buffer, &mut compression_ctx)?;
 
@@ -241,7 +257,13 @@ pub fn start(ctx: BotContext) {
                         // handle read
                         if event.is_readable() && player.connected && !player.kicked {
                             let result = || -> Result<(), CommunicationError> {
-                                read::read(&mut global_ctx, connection, |packet, write_buf, compression| handle_packet(packet, player, write_buf, compression))?;
+                                read::read(
+                                    &mut global_ctx,
+                                    connection,
+                                    |packet, write_buf, compression| {
+                                        handle_packet(packet, player, write_buf, compression)
+                                    },
+                                )?;
 
                                 Ok(())
                             }();
@@ -262,7 +284,12 @@ pub fn start(ctx: BotContext) {
 }
 
 // TODO: Improve
-fn handle_packet(packet: &FramedPacket, player: &mut Player, write_buf: &mut Buffer, compression: &mut CompressionContext) -> Result<(), CommunicationError> {
+fn handle_packet(
+    packet: &FramedPacket,
+    player: &mut Player,
+    write_buf: &mut Buffer,
+    compression: &mut CompressionContext,
+) -> Result<(), CommunicationError> {
     let RawPacket(id, mut packet) = packet::read_packet(packet, compression)?;
 
     match player.proto_state {
@@ -275,7 +302,7 @@ fn handle_packet(packet: &FramedPacket, player: &mut Player, write_buf: &mut Buf
             match login::server::PacketId::try_from(id).map_err(|_| ReadError::BadPacketID(id))? {
                 login::server::LoginSuccess::ID => {
                     player.proto_state = 3;
-                },
+                }
                 /*login::server::Disconnect::ID => {
 
                 }*/
@@ -284,19 +311,19 @@ fn handle_packet(packet: &FramedPacket, player: &mut Player, write_buf: &mut Buf
                 },*/
                 _ => {}
             }
-        },
+        }
         // Play
         3 => {
             match play::server::PacketId::try_from(id).map_err(|_| ReadError::BadPacketID(id))? {
                 play::server::KeepAlive::ID => {
-                    let packet = play::server::KeepAlive::read(&mut packet).map_err(ReadError::BadPacket)?;
-                    let response = play::client::KeepAlive {
-                        id: packet.id,
-                    };
+                    let packet =
+                        play::server::KeepAlive::read(&mut packet).map_err(ReadError::BadPacket)?;
+                    let response = play::client::KeepAlive { id: packet.id };
                     packet::write_packet(&response, write_buf, compression)?;
-                },
+                }
                 play::server::Login::ID => {
-                    let packet = play::server::Login::read(&mut packet).map_err(ReadError::BadPacket)?;
+                    let packet =
+                        play::server::Login::read(&mut packet).map_err(ReadError::BadPacket)?;
 
                     player.entity_id = packet.entity_id;
 
@@ -308,15 +335,16 @@ fn handle_packet(packet: &FramedPacket, player: &mut Player, write_buf: &mut Buf
                         model_customization: 0b00111111,
                         arm_position: ArmPosition::default(),
                         text_filtering_enabled: false,
-                        show_on_server_list: true
+                        show_on_server_list: true,
                     };
                     packet::write_packet(&response, write_buf, compression)?;
-                },
+                }
                 /*play::server::Disconnect::ID => {
 
                 }*/
                 play::server::PlayerPosition::ID => {
-                    let packet = play::server::PlayerPosition::read(&mut packet).map_err(ReadError::BadPacket)?;
+                    let packet = play::server::PlayerPosition::read(&mut packet)
+                        .map_err(ReadError::BadPacket)?;
 
                     if packet.relative_arguments & 0b10000 == 0 {
                         player.position.x = packet.x;
@@ -334,20 +362,16 @@ fn handle_packet(packet: &FramedPacket, player: &mut Player, write_buf: &mut Buf
                         player.position.z += packet.z;
                     }
 
-                    let response = play::client::AcceptTeleportation {
-                        id: packet.id,
-                    };
+                    let response = play::client::AcceptTeleportation { id: packet.id };
                     packet::write_packet(&response, write_buf, compression)?;
                 }
                 _ => {}
             }
-        },
+        }
         _ => return Err(ReadError::BadProtocolState.into()),
     }
 
     Ok(())
 }
 
-fn handle_tick(player: &mut Player, write_buf: &mut Buffer, compression: &mut CompressionContext) {
-
-}
+fn handle_tick(player: &mut Player, write_buf: &mut Buffer, compression: &mut CompressionContext) {}

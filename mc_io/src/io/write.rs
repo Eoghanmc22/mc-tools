@@ -1,13 +1,17 @@
-use std::io::{ErrorKind, Read, Write};
-use crate::buf::Buffer;
-use crate::ConnectionContext;
 use crate::error::CommunicationError;
+use crate::{buf::Buffer, ConnectionWriteContext};
+use std::io::{ErrorKind, Write};
 
-pub fn write<S>(connection: &mut ConnectionContext<S>) -> Result<(), CommunicationError>
-    where
-        S: Read + Write,
+pub fn write<S>(connection: &mut ConnectionWriteContext<S>) -> Result<(), CommunicationError>
+where
+    S: Write,
 {
-    let ConnectionContext { socket, unwritten_buf: unwritten, writeable, .. } = connection;
+    let ConnectionWriteContext {
+        socket,
+        unwritten_buf: unwritten,
+        writeable,
+        ..
+    } = connection;
     *writeable = true;
 
     if unwritten.is_empty() {
@@ -20,18 +24,28 @@ pub fn write<S>(connection: &mut ConnectionContext<S>) -> Result<(), Communicati
     Ok(())
 }
 
-pub fn write_buffer<S>(socket: S, to_write: &mut Buffer, unwritten: &mut Buffer, writeable: &mut bool) -> Result<(), CommunicationError>
-    where
-        S: Read + Write,
+pub fn write_buffer<S>(
+    socket: S,
+    to_write: &mut Buffer,
+    unwritten: &mut Buffer,
+    writeable: &mut bool,
+) -> Result<(), CommunicationError>
+where
+    S: Write,
 {
     write_slice(socket, to_write.get_written(), unwritten, writeable)?;
     to_write.reset();
     Ok(())
 }
 
-pub fn write_slice<S>(socket: S, mut to_write: &[u8], unwritten: &mut Buffer, writeable: &mut bool) -> Result<(), CommunicationError>
-    where
-        S: Read + Write,
+pub fn write_slice<S>(
+    socket: S,
+    mut to_write: &[u8],
+    unwritten: &mut Buffer,
+    writeable: &mut bool,
+) -> Result<(), CommunicationError>
+where
+    S: Write,
 {
     if to_write.is_empty() {
         return Ok(());
@@ -44,9 +58,13 @@ pub fn write_slice<S>(socket: S, mut to_write: &[u8], unwritten: &mut Buffer, wr
     Ok(())
 }
 
-fn write_buf<S>(mut socket: S, mut buffer: &[u8], writeable: &mut bool) -> Result<usize, CommunicationError>
-    where
-        S: Read + Write,
+fn write_buf<S>(
+    mut socket: S,
+    mut buffer: &[u8],
+    writeable: &mut bool,
+) -> Result<usize, CommunicationError>
+where
+    S: Write,
 {
     if !*writeable || buffer.is_empty() {
         return Ok(0);
@@ -61,9 +79,9 @@ fn write_buf<S>(mut socket: S, mut buffer: &[u8], writeable: &mut bool) -> Resul
             }
             WriteResult::WouldBlock => {
                 *writeable = false;
-                break
+                break;
             }
-            WriteResult::Empty => break
+            WriteResult::Empty => break,
         }
     }
     Ok(consume)
@@ -72,7 +90,7 @@ fn write_buf<S>(mut socket: S, mut buffer: &[u8], writeable: &mut bool) -> Resul
 enum WriteResult<'a> {
     Write(&'a [u8], usize),
     WouldBlock,
-    Empty
+    Empty,
 }
 
 fn socket_write<S: Write>(mut socket: S, buffer: &[u8]) -> Result<WriteResult, CommunicationError> {
@@ -85,7 +103,9 @@ fn socket_write<S: Write>(mut socket: S, buffer: &[u8]) -> Result<WriteResult, C
         match socket.write(buffer) {
             Ok(0) => return Err(CommunicationError::Closed),
             Ok(amt) => break Ok(WriteResult::Write(&buffer[amt..], amt)),
-            Err(ref err) if err.kind() == ErrorKind::WouldBlock => return Ok(WriteResult::WouldBlock),
+            Err(ref err) if err.kind() == ErrorKind::WouldBlock => {
+                return Ok(WriteResult::WouldBlock)
+            }
             Err(ref err) if err.kind() == ErrorKind::Interrupted => continue,
             Err(err) => return Err(CommunicationError::Io(err)),
         }
