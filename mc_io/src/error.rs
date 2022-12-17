@@ -1,5 +1,6 @@
-use std::io;
 use libdeflater::{CompressionError, DecompressionError};
+use proto::DecodingError;
+use std::io;
 use thiserror::Error;
 
 // todo add backtraces when possible
@@ -15,7 +16,7 @@ pub enum CommunicationError {
     #[error("Write error: {0}")]
     Write(#[from] WriteError),
     #[error("Read error: {0}")]
-    Read(#[from] ReadError)
+    Read(#[from] ReadError),
 }
 
 #[derive(Error, Debug)]
@@ -34,8 +35,6 @@ pub enum ReadError {
     ZeroSizedPacket,
     #[error("Decompression error: {0}")]
     Decompression(#[from] DecompressionError),
-    #[error("Error reading varint")]
-    VarInt,
     #[error("A received packet was compressed when it shouldn't have been")]
     BadlyCompressed,
     #[error("Received a packet while in an unknown protocol status")]
@@ -43,6 +42,5 @@ pub enum ReadError {
     #[error("Received a packet with bad id: {0}")]
     BadPacketID(u8),
     #[error("Received an unparseable packet: {0}")]
-    BadPacket(anyhow::Error)
+    BadPacket(#[from] DecodingError),
 }
-

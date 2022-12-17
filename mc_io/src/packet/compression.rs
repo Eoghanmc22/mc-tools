@@ -1,16 +1,25 @@
-use binary::slice_serialization::{VarInt, SliceSerializable};
 use libdeflater::{Compressor, Decompressor};
+use proto::primitive::VarInt;
+use proto::Data;
 
-use crate::{buf::Buffer, error::{WriteError, ReadError}, MAXIMUM_PACKET_SIZE};
 use crate::packet::lazy_varint::LazyVarint;
+use crate::{
+    buf::Buffer,
+    error::{ReadError, WriteError},
+    MAXIMUM_PACKET_SIZE,
+};
 
-pub fn compress<'a>(src: &[u8], dst: &'a mut Buffer, compressor: &mut Compressor) -> Result<&'a [u8], WriteError> {
+pub fn compress<'a>(
+    src: &[u8],
+    dst: &'a mut Buffer,
+    compressor: &mut Compressor,
+) -> Result<&'a [u8], WriteError> {
     let max_compressed_size = compressor.zlib_compress_bound(src.len());
 
     let mut buffer = dst.get_unwritten(3 + 3 + max_compressed_size);
 
-    let total_len = LazyVarint::new(&mut buffer, 3);
-    let data_len = LazyVarint::new(&mut buffer, 3);
+    let total_len = LazyVarint::<3>::new(&mut buffer);
+    let data_len = LazyVarint::<3>::new(&mut buffer);
 
     let compressed = compressor.zlib_compress(src, buffer)?;
 
@@ -21,10 +30,14 @@ pub fn compress<'a>(src: &[u8], dst: &'a mut Buffer, compressor: &mut Compressor
     Ok(unsafe { dst.advance(3 + 3 + compressed) })
 }
 
+pub fn decompress<'a>(
+    mut src: &[u8],
+    dst: &'a mut Buffer,
+    decompressor: &mut Decompressor,
+    compression_threshold: i32,
+) -> Result<&'a [u8], ReadError> {
+    let data_len = VarInt::try_decode(&mut src)?.into();
 
-pub fn decompress<'a>(mut src: &[u8], dst: &'a mut Buffer, decompressor: &mut Decompressor, compression_threshold: i32) -> Result<&'a [u8], ReadError> {
-    let data_len = VarInt::read(&mut src).map_err(|_| ReadError::VarInt)? as usize;
-    
     if data_len > MAXIMUM_PACKET_SIZE {
         return Err(ReadError::PacketTooLarge);
     }
@@ -45,13 +58,12 @@ pub fn decompress<'a>(mut src: &[u8], dst: &'a mut Buffer, decompressor: &mut De
     Ok(unsafe { dst.advance(decompressed) })
 }
 
-
 #[cfg(test)]
 mod tests {
-    use binary::slice_serialization::{SliceSerializable, VarInt};
-    use libdeflater::{CompressionLvl, Compressor, Decompressor};
-    use crate::Buffer;
     use super::*;
+    use crate::Buffer;
+    use libdeflater::{CompressionLvl, Compressor, Decompressor};
+    use proto::primitive::VarInt;
 
     #[test]
     fn compression_roundtrip() {
@@ -64,19 +76,24 @@ mod tests {
         do_compression_roundtrip::<10000>(&mut compressor, &mut decompressor);
     }
 
-    fn do_compression_roundtrip<const DATA_SIZE: usize>(compressor: &mut Compressor, decompressor: &mut Decompressor) {
+    fn do_compression_roundtrip<const DATA_SIZE: usize>(
+        compressor: &mut Compressor,
+        decompressor: &mut Decompressor,
+    ) {
         let original: [u8; DATA_SIZE] = rand::random();
 
         let mut compression_buffer = Buffer::with_capacity(6 + DATA_SIZE);
         let mut compressed = compress(&original, &mut compression_buffer, compressor).unwrap();
         let compressed_len = compressed.len();
 
-        let total_size = VarInt::read(&mut compressed).unwrap();
-        assert_eq!(total_size as usize, compressed.len());
+        let total_size = VarInt::try_decode(&mut compressed).unwrap().into();
+        assert_eq!(compressed.len(), total_size);
 
         let mut decompression_buffer = Buffer::with_capacity(6 + DATA_SIZE);
-        let decompressed = decompress(compressed, &mut decompression_buffer, decompressor, 1).unwrap();
+        let decompressed =
+            decompress(compressed, &mut decompression_buffer, decompressor, 1).unwrap();
         assert_eq!(original, decompressed);
         assert_eq!(compression_buffer.len(), compressed_len);
     }
 }
+

@@ -85,10 +85,18 @@ macro_rules! convert_impl {
     };
 }
 
+convert_impl!(u8, u8);
+convert_impl!(i8, u8);
+convert_impl!(u16, u16);
+convert_impl!(i16, u16);
 convert_impl!(u32, u32);
 convert_impl!(i32, u32);
 convert_impl!(u64, u64);
 convert_impl!(i64, u64);
+convert_impl!(u128, u128);
+convert_impl!(i128, u128);
+convert_impl!(usize, usize);
+convert_impl!(isize, usize);
 
 #[cfg(test)]
 mod tests {

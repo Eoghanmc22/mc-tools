@@ -10,14 +10,13 @@ pub trait Data<'a>: Sized {
     fn try_decode(buffer: &mut &'a [u8]) -> Result<Self, DecodingError>;
 
     fn expected_size(&self) -> usize;
+    // TODO Can this be implemented without returning a buffer? ie fn(&self, buffer: &mut &'b mut [u8])
     fn encode<'b>(&self, buffer: &'b mut [u8]) -> &'b mut [u8];
 }
 
-pub trait Packet<'a, T>: Data<'a> + Debug
-where
-    T: Debug,
-{
-    const PACKET_ID: T;
+pub trait Packet<'a>: Data<'a> + Debug {
+    type Proto: Debug;
+    const PACKET_ID: Self::Proto;
     const PACKET_ID_NUM: u8;
     const DIRECTION: Direction;
 }
@@ -48,7 +47,8 @@ macro_rules! define_proto {
         }
 
         $(
-            impl<'a> $crate::Packet<'a, $proto_name> for $packet $( <$life> )? {
+            impl<'a> $crate::Packet<'a> for $packet $( <$life> )? {
+                type Proto = $proto_name;
                 const PACKET_ID: $proto_name = $proto_name::$packet;
                 const PACKET_ID_NUM: u8 = $packet_id;
                 const DIRECTION: $crate::Direction = $dir;

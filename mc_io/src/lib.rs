@@ -1,13 +1,15 @@
-use std::io::{Read, Write};
-use libdeflater::{CompressionLvl, Compressor, Decompressor};
+#![feature(split_array)]
+
 use crate::buf::Buffer;
 use crate::error::CommunicationError;
 use crate::io::write;
+use libdeflater::{CompressionLvl, Compressor, Decompressor};
+use std::io::{Read, Write};
 
-pub mod error;
 pub mod buf;
-pub mod packet;
+pub mod error;
 pub mod io;
+pub mod packet;
 
 #[derive(Debug)]
 pub struct FramedPacket<'a>(pub &'a [u8]);
@@ -24,7 +26,7 @@ pub struct ConnectionContext<S: Read + Write> {
     // TODO would smallvec or similar be better?
     pub unwritten_buf: Buffer,
     pub unread_buf: Buffer,
-    pub writeable: bool
+    pub writeable: bool,
 }
 
 impl<S: Read + Write> ConnectionContext<S> {
@@ -34,16 +36,26 @@ impl<S: Read + Write> ConnectionContext<S> {
             socket,
             unwritten_buf: Buffer::new(),
             unread_buf: Buffer::new(),
-            writeable: false
+            writeable: false,
         }
     }
 
     pub fn write_buffer(&mut self, to_write: &mut Buffer) -> Result<(), CommunicationError> {
-        write::write_buffer(&mut self.socket, to_write, &mut self.unwritten_buf, &mut self.writeable)
+        write::write_buffer(
+            &mut self.socket,
+            to_write,
+            &mut self.unwritten_buf,
+            &mut self.writeable,
+        )
     }
 
     pub fn write_slice(&mut self, to_write: &[u8]) -> Result<(), CommunicationError> {
-        write::write_slice(&mut self.socket, to_write, &mut self.unwritten_buf, &mut self.writeable)
+        write::write_slice(
+            &mut self.socket,
+            to_write,
+            &mut self.unwritten_buf,
+            &mut self.writeable,
+        )
     }
 }
 
@@ -67,7 +79,10 @@ impl GlobalContext {
         }
     }
 
-    pub fn compression<S: Read + Write>(&mut self, connection: &ConnectionContext<S>) -> (&mut Buffer, CompressionContext) {
+    pub fn compression<S: Read + Write>(
+        &mut self,
+        connection: &ConnectionContext<S>,
+    ) -> (&mut Buffer, CompressionContext) {
         self.reset();
         (
             &mut self.write_buf,
@@ -75,8 +90,8 @@ impl GlobalContext {
                 compression_threshold: connection.compression_threshold,
                 compression_buf: &mut self.compression_buf,
                 compressor: &mut self.compressor,
-                decompressor: &mut self.decompressor
-            }
+                decompressor: &mut self.decompressor,
+            },
         )
     }
 
@@ -99,5 +114,5 @@ pub struct CompressionContext<'a, 'b, 'c> {
     pub compression_buf: &'a mut Buffer,
 
     pub compressor: &'b mut Compressor,
-    pub decompressor: &'c mut Decompressor
+    pub decompressor: &'c mut Decompressor,
 }
