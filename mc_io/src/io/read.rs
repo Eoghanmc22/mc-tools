@@ -11,34 +11,14 @@ use std::io::{ErrorKind, Read, Write};
 
 const PROBE_LEN: usize = 2048;
 
-pub trait ReadHandler {
-    fn handle(
-        &mut self,
-        packet: &FramedPacket,
-        compression_ctx: CompressionReadContext,
-    ) -> Result<(), CommunicationError>;
-}
-
-impl<F> ReadHandler for F
-where
-    F: FnMut(&FramedPacket, CompressionReadContext) -> Result<(), CommunicationError>,
-{
-    fn handle(
-        &mut self,
-        packet: &FramedPacket,
-        compression_ctx: CompressionReadContext,
-    ) -> Result<(), CommunicationError> {
-        (self)(packet, compression_ctx)
-    }
-}
-
-pub fn read<S>(
+pub fn read<S, F>(
     ctx: &mut GlobalReadContext,
     connection: &mut ConnectionReadContext<S>,
-    mut handler: impl ReadHandler,
+    mut handler: F,
 ) -> Result<(), CommunicationError>
 where
     S: Read + Write,
+    F: FnMut(&FramedPacket, CompressionReadContext) -> Result<(), CommunicationError>,
 {
     let GlobalReadContext {
         read_buf,
@@ -67,7 +47,7 @@ where
                 decompressor,
             };
 
-            handler.handle(&packet, compression_ctx)?;
+            (handler)(&packet, compression_ctx)?;
 
             read_buf.consume(network_len);
         }

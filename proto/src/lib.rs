@@ -55,17 +55,20 @@ macro_rules! define_proto {
             }
         )*
 
-        pub trait PacketHandler<E: std::error::Error + From<$crate::DecodingError>> {
-            paste::paste! {
+        paste::paste! {
+            pub trait [< PacketHandler $proto_name >] {
+                type Error: std::error::Error + From<$crate::DecodingError>;
+
                 $(
-                    fn [<handle_ $packet:snake>](&mut self, _: $packet) -> Result<(), E> {
+                    fn [<handle_ $packet:snake>](&mut self, _: $packet) -> Result<(), Self::Error> {
                         Ok(())
                     }
                 )*
 
-                fn [< parse_and_handle_ $proto_name:snake >] (&mut self, mut bytes: &[u8]) -> Result<(), E> {
-                    let packet_id_byte: u8 = $crate::Data::try_decode(&mut bytes)?;
+                fn [< parse_and_handle_ $proto_name:snake >] <'a, I: Into<&'a [u8]>> (&mut self, packet: I) -> Result<(), Self::Error> {
+                    let mut bytes = packet.into();
 
+                    let packet_id_byte: u8 = $crate::Data::try_decode(&mut bytes)?;
                     if let Ok(packet_id) = $proto_name::try_from(packet_id_byte) {
                         match packet_id {
                             $(
@@ -76,9 +79,7 @@ macro_rules! define_proto {
                                         return Err($crate::DecodingError::DirtyBuffer(format!("{:?}", packet_id)).into())?
                                     }
 
-                                    paste::paste! {
-                                        Ok(self.[<handle_ $packet:snake>](packet)?)
-                                    }
+                                    Ok(self.[<handle_ $packet:snake>](packet)?)
                                 }
                             )*
                         }

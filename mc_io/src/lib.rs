@@ -16,7 +16,12 @@ pub mod packet;
 pub struct FramedPacket<'a>(pub &'a [u8]);
 
 #[derive(Debug)]
-pub struct RawPacket<'a>(pub u8, pub &'a [u8]);
+pub struct RawPacket<'a>(pub &'a [u8]);
+impl<'a> From<RawPacket<'a>> for &'a [u8] {
+    fn from(value: RawPacket<'a>) -> Self {
+        value.0
+    }
+}
 
 const MAXIMUM_PACKET_SIZE: usize = 2097148;
 

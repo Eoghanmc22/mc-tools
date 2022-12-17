@@ -1,5 +1,4 @@
-use proto::primitive::VarInt;
-use proto::{Data, Packet};
+use proto::Packet;
 
 use crate::buf::Buffer;
 use crate::error::{ReadError, WriteError};
@@ -151,7 +150,7 @@ pub fn read_packet<'a>(
         ..
     } = ctx;
 
-    let mut buffer = if compression_threshold > 0 {
+    let buffer = if compression_threshold > 0 {
         compression::decompress(
             packet.0,
             compression_buf,
@@ -162,6 +161,5 @@ pub fn read_packet<'a>(
         packet.0
     };
 
-    let packet_id = VarInt::try_decode(&mut buffer)?;
-    Ok(RawPacket(packet_id.into(), buffer))
+    Ok(RawPacket(buffer))
 }
