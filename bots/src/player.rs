@@ -10,5 +10,4 @@ pub struct Player {
     pub kicked: bool,
 
     pub position: Point3D<f64>,
-    pub velocity: Vector3D<f64>,
 }

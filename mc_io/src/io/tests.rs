@@ -1,6 +1,6 @@
 use super::{
     read::read,
-    write::{write, write_buffer},
+    write::{write, write_slice},
 };
 use helpers::{Chunked, EOF2WB};
 
@@ -69,10 +69,15 @@ mod write {
         let written = unsafe { buffer.advance(1000) }.to_vec();
 
         let mut writeable = true;
-        write_buffer(&mut socket, &mut buffer, &mut unwritten, &mut writeable).unwrap();
+        write_slice(
+            &mut socket,
+            buffer.get_written(),
+            &mut unwritten,
+            &mut writeable,
+        )
+        .unwrap();
 
         assert!(writeable);
-        assert!(buffer.is_empty());
         assert!(unwritten.is_empty());
         assert_eq!(socket.0 .0.into_inner(), written);
     }
@@ -88,10 +93,15 @@ mod write {
         let written = unsafe { buffer.advance(1000) }.to_vec();
 
         let mut writeable = true;
-        write_buffer(&mut socket, &mut buffer, &mut unwritten, &mut writeable).unwrap();
+        write_slice(
+            &mut socket,
+            buffer.get_written(),
+            &mut unwritten,
+            &mut writeable,
+        )
+        .unwrap();
 
         assert!(!writeable);
-        assert!(buffer.is_empty());
         assert_eq!(socket.0 .0.into_inner(), &written[..500]);
         assert_eq!(unwritten.get_written(), &written[500..]);
 
@@ -125,7 +135,13 @@ mod write {
         let written = unsafe { buffer.advance(1000) }.to_vec();
 
         let mut writeable = true;
-        write_buffer(&mut socket, &mut buffer, &mut unwritten, &mut writeable).unwrap();
+        write_slice(
+            &mut socket,
+            buffer.get_written(),
+            &mut unwritten,
+            &mut writeable,
+        )
+        .unwrap();
 
         assert!(!writeable);
         assert!(buffer.is_empty());

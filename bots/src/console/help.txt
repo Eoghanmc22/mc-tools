@@ -1,0 +1,5 @@
+Keybinds:
+
+General:
+Ctrl-C, q       Quit
+?               Open/Close help menu

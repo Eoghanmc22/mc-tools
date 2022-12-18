@@ -24,20 +24,6 @@ where
     Ok(())
 }
 
-pub fn write_buffer<S>(
-    socket: S,
-    to_write: &mut Buffer,
-    unwritten: &mut Buffer,
-    writeable: &mut bool,
-) -> Result<(), CommunicationError>
-where
-    S: Write,
-{
-    write_slice(socket, to_write.get_written(), unwritten, writeable)?;
-    to_write.reset();
-    Ok(())
-}
-
 pub fn write_slice<S>(
     socket: S,
     mut to_write: &[u8],

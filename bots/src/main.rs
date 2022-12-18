@@ -1,26 +1,90 @@
-use std::thread;
+use crate::{
+    args::Args,
+    threading::{BotMessage, Worker},
+};
 use anyhow::Context;
-use crate::args::Args;
 use clap::Parser;
+use crossbeam::channel::unbounded;
+use log::{info, LevelFilter};
+use std::{
+    sync::{atomic::AtomicU64, Arc},
+    thread,
+};
 
-mod args;
 mod address;
-mod console;
+mod args;
 mod bot;
-mod channels;
+mod console;
 mod player;
+mod threading;
+
+const NAME: &str = env!("CARGO_PKG_NAME");
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn main() -> anyhow::Result<()> {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+    tui_logger::init_logger(LevelFilter::Info).unwrap();
+
+    info!("Starting {} - {}", NAME, VERSION);
+
     let args = Args::parse();
 
     let threads = if args.threads == 0 {
-        thread::available_parallelism().context("Could not retrieve parallelism. Try specifying a thread count with -p THREADS")?.get() / 2
+        thread::available_parallelism()
+            .context(
+                "Could not retrieve parallelism. Try specifying a thread count with -p THREADS",
+            )?
+            .get()
+            / 2
     } else {
         args.threads
     };
-    
-    
+
+    info!("Using {} threads", threads);
+
+    let mut workers = Vec::new();
+
+    thread::scope(|s| {
+        for _ in 0..threads {
+            let worker = Worker {
+                packets_tx: Arc::new(AtomicU64::new(0)),
+                packets_rx: Arc::new(AtomicU64::new(0)),
+                bytes_tx: Arc::new(AtomicU64::new(0)),
+                bytes_rx: Arc::new(AtomicU64::new(0)),
+                bot_bound: unbounded(),
+                console_bound: unbounded(),
+            };
+
+            {
+                let worker = worker.clone();
+                s.spawn(move || {
+                    // todo!("Spawn workers");
+                });
+            }
+
+            workers.push(worker);
+        }
+
+        s.spawn(|| {
+            console::start(args.clone(), workers.clone()).expect("Run console");
+        });
+
+        {
+            let workers = workers.clone();
+            s.spawn(move || {
+                for i in 0..args.count {
+                    let worker = i % workers.len();
+                    let worker = &workers[worker];
+
+                    let name = format!("Bot{}", i);
+                    worker
+                        .bot_bound
+                        .0
+                        .send(BotMessage::ConnectBot(name))
+                        .expect("Send msg");
+                }
+            });
+        }
+    });
 
     Ok(())
 }

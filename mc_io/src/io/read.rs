@@ -7,7 +7,7 @@ use crate::{
     CompressionReadContext, ConnectionReadContext, FramedPacket, GlobalReadContext,
     MAXIMUM_PACKET_SIZE,
 };
-use std::io::{ErrorKind, Read, Write};
+use std::io::{ErrorKind, Read};
 
 const PROBE_LEN: usize = 2048;
 
@@ -17,7 +17,7 @@ pub fn read<S, F>(
     mut handler: F,
 ) -> Result<(), CommunicationError>
 where
-    S: Read + Write,
+    S: Read,
     F: FnMut(&FramedPacket, CompressionReadContext) -> Result<(), CommunicationError>,
 {
     let GlobalReadContext {

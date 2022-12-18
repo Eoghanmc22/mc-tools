@@ -2,8 +2,9 @@
 
 use crate::buf::Buffer;
 use crate::error::CommunicationError;
-use crate::io::write;
+use crate::io::{read, write};
 use libdeflater::{CompressionLvl, Compressor, Decompressor};
+use packet::handle::{self, PacketHandler};
 use proto::Packet;
 use std::io::{Read, Write};
 
@@ -41,6 +42,26 @@ impl<S: Read> ConnectionReadContext<S> {
             unread_buf: Buffer::new(),
         }
     }
+
+    pub fn read_packets<H: PacketHandler>(
+        &mut self,
+        ctx: &mut GlobalReadContext,
+        handler: &mut H,
+    ) -> Result<(), CommunicationError> {
+        let handler = handle::create_handler(handler);
+        self.read(ctx, handler)
+    }
+
+    pub fn read<F>(
+        &mut self,
+        ctx: &mut GlobalReadContext,
+        handler: F,
+    ) -> Result<(), CommunicationError>
+    where
+        F: FnMut(&FramedPacket, CompressionReadContext) -> Result<(), CommunicationError>,
+    {
+        read::read(ctx, self, handler)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -67,19 +88,13 @@ impl<S: Write> ConnectionWriteContext<S> {
         packet: &'a P,
         ctx: &mut GlobalWriteContext,
     ) -> Result<(), CommunicationError> {
-        ctx.reset();
         let (write_buf, compression_ctx) = ctx.compression(self.compression_threshold);
         packet::helpers::write_packet(packet, write_buf, compression_ctx)?;
         Ok(self.write_buffer(write_buf)?)
     }
 
     pub fn write_buffer(&mut self, to_write: &mut Buffer) -> Result<(), CommunicationError> {
-        write::write_buffer(
-            &mut self.socket,
-            to_write,
-            &mut self.unwritten_buf,
-            &mut self.writeable,
-        )
+        self.write_slice(to_write.get_written())
     }
 
     pub fn write_slice(&mut self, to_write: &[u8]) -> Result<(), CommunicationError> {

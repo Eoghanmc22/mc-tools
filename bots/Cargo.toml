@@ -11,18 +11,24 @@ description = "A tool to stress test minecraft servers"
 # Networking
 mio = { version = "0.8", features = ["os-poll", "net"] }
 mc_io = { path = "../mc_io" }
+proto = { path = "../proto" }
 
 # UX
+tui = "0.19"
+crossterm = "0.25"
 clap = { version = "3.2", features = ["derive"] }
-console = "0.15"
-indicatif = "0.17"
-anyhow = "1"
-log = "0.4"
-env_logger = "0.9"
+
+# Config
 
 # Threading
 crossbeam = "0.8"
 
+# Logging
+log = "0.4"
+tui-logger = "0.8"
+
 # Misc
 rand = "0.8"
+number_prefix = "0.4"
 euclid = "0.22.7"
+anyhow = "1"
