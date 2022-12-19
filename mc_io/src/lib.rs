@@ -170,7 +170,7 @@ pub struct GlobalWriteContext {
     pub write_buf: Buffer,
     pub compression_buf: Buffer,
 
-    pub compressor: Compressor,
+    pub compressor: Option<Compressor>,
 }
 
 impl GlobalWriteContext {
@@ -178,7 +178,7 @@ impl GlobalWriteContext {
         Self {
             write_buf: Buffer::new(),
             compression_buf: Buffer::new(),
-            compressor: Compressor::new(CompressionLvl::fastest()),
+            compressor: None,
         }
     }
 
@@ -187,12 +187,20 @@ impl GlobalWriteContext {
         compression_threshold: i32,
     ) -> (&mut Buffer, CompressionWriteContext) {
         self.reset();
+
+        let compressor = if let Some(ref mut compressor) = self.compressor {
+            compressor
+        } else {
+            self.compressor = Some(Compressor::new(CompressionLvl::fastest()));
+            self.compressor.as_mut().unwrap()
+        };
+
         (
             &mut self.write_buf,
             CompressionWriteContext {
                 compression_threshold,
                 compression_buf: &mut self.compression_buf,
-                compressor: &mut self.compressor,
+                compressor,
             },
         )
     }

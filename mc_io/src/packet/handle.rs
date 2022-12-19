@@ -1,12 +1,9 @@
-use crate::{
-    error::{CommunicationError, ReadError},
-    CompressionReadContext, FramedPacket, RawPacket,
-};
+use crate::{error::CommunicationError, CompressionReadContext, FramedPacket, RawPacket};
 
 use super::helpers;
 
 pub trait PacketHandler {
-    fn parse_and_handle(&mut self, packet: RawPacket) -> Result<(), ReadError>;
+    fn parse_and_handle(&mut self, packet: RawPacket) -> Result<(), CommunicationError>;
 }
 
 pub(crate) fn create_handler<'a, H: PacketHandler>(

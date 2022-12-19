@@ -2,7 +2,7 @@ use crate::player::Player;
 use crate::threading::{Worker, ConsoleMessage};
 use crate::{threading::BotMessage, Args};
 use anyhow::Context;
-use log::{warn, info};
+use log::{warn, info, error};
 use mc_io::error::CommunicationError;
 use mc_io::{GlobalReadContext, GlobalWriteContext};
 use mio::net::TcpStream;
@@ -11,6 +11,7 @@ use proto::packets::c2s::handshake::HandshakePacket;
 use proto::packets::c2s::login::{LoginProtoC2S, LoginStartPacket};
 use std::collections::HashMap;
 use std::io::{ErrorKind, Read, Write};
+use std::mem;
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -100,6 +101,8 @@ pub fn start(ctx: BotContext, args: &Args, worker: Worker) -> anyhow::Result<()>
                             let player_read = player.ctx_read.take();
 
                             if let Some(mut player_read) = player_read {
+                                player.g_ctx_write = Some(mem::take(&mut ctx_write));
+
                                 let res = player_read.read_packets(&mut ctx_read, player);
 
                                 if let Err(error) = res {
@@ -107,6 +110,19 @@ pub fn start(ctx: BotContext, args: &Args, worker: Worker) -> anyhow::Result<()>
                                 }
 
                                 player.ctx_read = Some(player_read);
+
+                                if let Some(threshold) = player.compression_threshold_dirty {
+                                    player.ctx_write.compression_threshold = threshold;
+                                    if let Some(ref mut player_read) = player.ctx_read {
+                                        player_read.compression_threshold = threshold;
+                                    }
+                                }
+
+                                if let Some(g_ctx_write) = player.g_ctx_write.take() {
+                                    ctx_write = g_ctx_write;
+                                } else {
+                                    error!("A packet reader stole the globle write context");
+                                }
                             }
                         }
                     }

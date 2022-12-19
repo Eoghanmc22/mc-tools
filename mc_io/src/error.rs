@@ -42,3 +42,9 @@ pub enum ReadError {
     #[error("Received an unparseable packet: {0}")]
     BadPacket(#[from] DecodingError),
 }
+
+impl From<DecodingError> for CommunicationError {
+    fn from(value: DecodingError) -> Self {
+        CommunicationError::Read(value.into())
+    }
+}
