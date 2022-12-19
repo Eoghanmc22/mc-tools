@@ -1,8 +1,8 @@
 use crate::player::Player;
-use crate::threading::Worker;
+use crate::threading::{Worker, ConsoleMessage};
 use crate::{threading::BotMessage, Args};
 use anyhow::Context;
-use log::warn;
+use log::{warn, info};
 use mc_io::error::CommunicationError;
 use mc_io::{GlobalReadContext, GlobalWriteContext};
 use mio::net::TcpStream;
@@ -14,12 +14,10 @@ use std::io::ErrorKind;
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
-use std::time::Duration;
 
 const PROTOCOL_VERSION: u32 = 759;
 
 const WAKER_TOKEN: Token = Token(0);
-const TICK_DURATION: Duration = Duration::from_millis(50);
 
 static NEXT_TOKEN: AtomicUsize = AtomicUsize::new(1);
 
@@ -69,9 +67,9 @@ pub fn start(ctx: BotContext, args: &Args, worker: Worker) -> anyhow::Result<()>
                                 for player in players.values_mut() {
                                     let res = player.tick(args, &mut ctx_write);
 
-                            if let Err(error) = res {
-                                handle_error(player, error);
-                            }
+                                    if let Err(error) = res {
+                                        handle_error(player, error, &worker);
+                                    }
                                 }
                             }
                         }
@@ -81,10 +79,10 @@ pub fn start(ctx: BotContext, args: &Args, worker: Worker) -> anyhow::Result<()>
                     if let Some(player) = players.get_mut(&bot_token) {
                         // Set up the player if needed
                         if event.is_writable() && !player.connected && !player.kicked {
-                            let res = connect_bot(player, args.server.0, &mut ctx_write);
+                            let res = connect_bot(player, args.server.0, &mut ctx_write, &worker);
 
                             if let Err(error) = res {
-                                handle_error(player, error);
+                                handle_error(player, error, &worker);
                             }
                         }
 
@@ -93,7 +91,7 @@ pub fn start(ctx: BotContext, args: &Args, worker: Worker) -> anyhow::Result<()>
                             let res = player.ctx_write.write_unwritten();
 
                             if let Err(error) = res {
-                                handle_error(player, error);
+                                handle_error(player, error, &worker);
                             }
                         }
 
@@ -105,7 +103,7 @@ pub fn start(ctx: BotContext, args: &Args, worker: Worker) -> anyhow::Result<()>
                                 let res = player_read.read_packets(&mut ctx_read, player);
 
                                 if let Err(error) = res {
-                                    handle_error(player, error);
+                                    handle_error(player, error, &worker);
                                 }
 
                                 player.ctx_read = Some(player_read);
@@ -125,6 +123,8 @@ fn create_bot(
     server: SocketAddr,
     username: String,
 ) -> Option<(Token, Player<Backend>)> {
+    info!("Starting Bot: {}", username);
+
     let mut stream = match Backend::connect(server) {
         Ok(stream) => stream,
         Err(error) => {
@@ -144,10 +144,7 @@ fn create_bot(
     Some((token, player))
 }
 
-fn connect_bot(player: &mut Player<Backend>, server: SocketAddr, ctx: &mut GlobalWriteContext) -> Result<(), CommunicationError> {
-    // FIXME check TcpStream::peer_addr() for errors before actually
-    // labaling the connection as connected
-
+fn connect_bot(player: &mut Player<Backend>, server: SocketAddr, ctx: &mut GlobalWriteContext, worker: &Worker) -> Result<(), CommunicationError> {
     match player.socket.peer_addr() {
         Err(err) if err.kind() == ErrorKind::NotConnected => return Ok(()),
         Err(err) => return Err(err.into()),
@@ -169,13 +166,18 @@ fn connect_bot(player: &mut Player<Backend>, server: SocketAddr, ctx: &mut Globa
         uuid: None,
     };
 
-    player.ctx_write.write_packet(&handshake, ctx);
-    player.ctx_write.write_packet(&login_start, ctx);
+    player.ctx_write.write_packet(&handshake, ctx)?;
+    player.ctx_write.write_packet(&login_start, ctx)?;
+
+    info!("Bot Connected: {}", player.username);
+    worker.console_bound.0.send(ConsoleMessage::BotConnected).expect("Send msg");
 
     Ok(())
 }
 
-fn handle_error<S>(player: &mut Player<S>, error: CommunicationError) {
-    warn!("Bot disconnected {}: {}", player.username, error);
+fn handle_error<S>(player: &mut Player<S>, error: CommunicationError, worker: &Worker) {
     player.kicked = true;
+
+    warn!("Bot disconnected {}: {}", player.username, error);
+    worker.console_bound.0.send(ConsoleMessage::BotDisconnected).expect("Send msg");
 }
