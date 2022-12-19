@@ -1,6 +1,7 @@
 use std::sync::{atomic::AtomicU64, Arc};
 
 use crossbeam::channel::{Receiver, Sender};
+use mio::Waker;
 
 pub enum ConsoleMessage {
     BotConnected,
@@ -9,6 +10,7 @@ pub enum ConsoleMessage {
 
 pub enum BotMessage {
     ConnectBot(String),
+    Tick,
 }
 
 #[derive(Debug, Clone)]
@@ -20,4 +22,6 @@ pub struct Worker {
 
     pub bot_bound: (Sender<BotMessage>, Receiver<BotMessage>),
     pub console_bound: (Sender<ConsoleMessage>, Receiver<ConsoleMessage>),
+
+    pub waker: Option<Arc<Waker>>,
 }

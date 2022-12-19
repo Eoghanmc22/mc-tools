@@ -9,7 +9,7 @@ pub trait PacketHandler {
     fn parse_and_handle(&mut self, packet: RawPacket) -> Result<(), ReadError>;
 }
 
-pub fn create_handler<'a, H: PacketHandler>(
+pub(crate) fn create_handler<'a, H: PacketHandler>(
     handler: &'a mut H,
 ) -> impl FnMut(&FramedPacket, CompressionReadContext) -> Result<(), CommunicationError> + 'a {
     |packet, ctx| {

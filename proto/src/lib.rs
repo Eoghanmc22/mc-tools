@@ -55,6 +55,10 @@ macro_rules! define_proto {
             }
         )*
 
+        impl $proto_name {
+            pub const PROTOCOL_ID: u8 = $proto_id;
+        }
+
         paste::paste! {
             pub trait [< PacketHandler $proto_name >] {
                 type Error: std::error::Error + From<$crate::DecodingError>;

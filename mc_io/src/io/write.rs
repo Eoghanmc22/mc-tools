@@ -1,10 +1,14 @@
 use crate::error::CommunicationError;
 use crate::{buf::Buffer, ConnectionWriteContext};
 use std::io::{ErrorKind, Write};
+use std::ops::Deref;
 
-pub fn write<S>(connection: &mut ConnectionWriteContext<S>) -> Result<(), CommunicationError>
+pub(crate) fn write_unwritten<D, S>(
+    connection: &mut ConnectionWriteContext<D>,
+) -> Result<(), CommunicationError>
 where
-    S: Write,
+    D: Deref<Target = S>,
+    for<'a> &'a S: Write,
 {
     let ConnectionWriteContext {
         socket,
@@ -18,13 +22,13 @@ where
         return Ok(());
     }
 
-    let consumed = write_buf(socket, unwritten.get_written(), writeable)?;
+    let consumed = write_buf(D::deref(socket), unwritten.get_written(), writeable)?;
     unwritten.consume(consumed);
 
     Ok(())
 }
 
-pub fn write_slice<S>(
+pub(crate) fn write_slice<S>(
     socket: S,
     mut to_write: &[u8],
     unwritten: &mut Buffer,

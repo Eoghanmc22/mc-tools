@@ -31,7 +31,15 @@ pub mod login {
     define_data! {
         pub struct LoginStartPacket<'a> {
             pub username: &'a str,
+            pub signature_data: Option<Signature<'a>>,
             pub uuid: Option<u128>
+        }
+    }
+    define_data! {
+        pub struct Signature<'a> {
+            pub time: u64,
+            pub public_key: &'a [u8],
+            pub signature: &'a [u8]
         }
     }
 

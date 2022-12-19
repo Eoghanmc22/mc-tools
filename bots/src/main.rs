@@ -9,6 +9,7 @@ use log::{info, LevelFilter};
 use std::{
     sync::{atomic::AtomicU64, Arc},
     thread,
+    time::{Duration, Instant},
 };
 
 mod address;
@@ -21,7 +22,9 @@ mod threading;
 const NAME: &str = env!("CARGO_PKG_NAME");
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-// motd, implement cached reading (hash first few bytes and lookup in some kind
+const TICK_DURATION: Duration = Duration::from_millis(50);
+
+// A way to stop everything, motd, implement cached reading (hash first few bytes and lookup in some kind
 // of hash map), implement tps monetering, make ui more colerful, implement bots.rs
 fn main() -> anyhow::Result<()> {
     tui_logger::init_logger(LevelFilter::Info).unwrap();
@@ -46,46 +49,66 @@ fn main() -> anyhow::Result<()> {
     let mut workers = Vec::new();
 
     thread::scope(|s| {
+        // Worker threads
         for _ in 0..threads {
-            let worker = Worker {
+            let mut worker = Worker {
                 packets_tx: Arc::new(AtomicU64::new(0)),
                 packets_rx: Arc::new(AtomicU64::new(0)),
                 bytes_tx: Arc::new(AtomicU64::new(0)),
                 bytes_rx: Arc::new(AtomicU64::new(0)),
                 bot_bound: unbounded(),
                 console_bound: unbounded(),
+                waker: None,
             };
+
+            let bot_context = bot::setup_bot(&mut worker).expect("Setup bot");
 
             {
                 let worker = worker.clone();
-                s.spawn(move || {
-                    // todo!("Spawn workers");
+                s.spawn(|| {
+                    bot::start(bot_context, &args, worker).unwrap();
                 });
             }
 
             workers.push(worker);
         }
 
+        // Console ui
         s.spawn(|| {
-            console::start(args.clone(), workers.clone()).expect("Run console");
+            console::start(&args, &workers).expect("Run console");
         });
 
-        {
-            let workers = workers.clone();
-            s.spawn(move || {
-                for i in 0..args.count {
-                    let worker = i % workers.len();
-                    let worker = &workers[worker];
+        // Bot spawner
+        s.spawn(|| {
+            for i in 0..args.count {
+                let worker = i % workers.len();
+                let worker = &workers[worker];
 
-                    let name = format!("Bot{}", i);
-                    worker
-                        .bot_bound
-                        .0
-                        .send(BotMessage::ConnectBot(name))
-                        .expect("Send msg");
+                let name = format!("Bot{}", i);
+                worker
+                    .bot_bound
+                    .0
+                    .send(BotMessage::ConnectBot(name))
+                    .expect("Send msg");
+
+                worker.waker.as_ref().unwrap().wake().unwrap();
+            }
+        });
+
+        // Tick schedualer
+        s.spawn(|| {
+            let mut tick = Instant::now();
+            loop {
+                for worker in &workers {
+                    worker.bot_bound.0.send(BotMessage::Tick).expect("Send msg");
+                    worker.waker.as_ref().unwrap().wake().unwrap();
                 }
-            });
-        }
+
+                tick += TICK_DURATION;
+                let delay = Instant::now() - tick;
+                thread::sleep(delay);
+            }
+        });
     });
 
     Ok(())

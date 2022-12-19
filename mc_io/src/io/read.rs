@@ -8,16 +8,18 @@ use crate::{
     MAXIMUM_PACKET_SIZE,
 };
 use std::io::{ErrorKind, Read};
+use std::ops::Deref;
 
 const PROBE_LEN: usize = 2048;
 
-pub fn read<S, F>(
+pub fn read<D, S, F>(
     ctx: &mut GlobalReadContext,
-    connection: &mut ConnectionReadContext<S>,
+    connection: &mut ConnectionReadContext<D>,
     mut handler: F,
 ) -> Result<(), CommunicationError>
 where
-    S: Read,
+    D: Deref<Target = S>,
+    for<'a> &'a S: Read,
     F: FnMut(&FramedPacket, CompressionReadContext) -> Result<(), CommunicationError>,
 {
     let GlobalReadContext {
@@ -37,7 +39,7 @@ where
     read_buf.copy_from(unread_buf.get_written());
     unread_buf.reset();
 
-    while let ReadResult::Read(..) = socket_read(&mut *socket, read_buf)? {
+    while let ReadResult::Read(..) = socket_read(D::deref(socket), read_buf)? {
         compression_buf.reset();
 
         while let DecodeResult::Packet(packet, network_len) = next_packet(read_buf.get_written())? {

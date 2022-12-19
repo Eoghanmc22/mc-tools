@@ -2,7 +2,7 @@ use std::mem;
 
 use proto::{primitive::VarNum, Data};
 
-pub struct LazyVarint<'a, const MAX_WIDTH: usize> {
+pub(crate) struct LazyVarint<'a, const MAX_WIDTH: usize> {
     buffer: &'a mut [u8; MAX_WIDTH],
 }
 

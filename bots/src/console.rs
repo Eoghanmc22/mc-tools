@@ -20,7 +20,7 @@ use crate::{threading::Worker, Args};
 
 use self::app::App;
 
-pub fn start(args: Args, workers: Vec<Worker>) -> anyhow::Result<()> {
+pub fn start(args: &Args, workers: &[Worker]) -> anyhow::Result<()> {
     // Setup Terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -47,7 +47,11 @@ pub fn start(args: Args, workers: Vec<Worker>) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App, args: Args) -> anyhow::Result<()> {
+fn run_app<B: Backend>(
+    terminal: &mut Terminal<B>,
+    mut app: App,
+    args: &Args,
+) -> anyhow::Result<()> {
     let mut last_tick = Instant::now();
     let tick_rate = Duration::from_millis(args.ui_update_rate);
 

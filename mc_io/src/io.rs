@@ -1,5 +1,5 @@
-pub mod read;
-pub mod write;
+pub(crate) mod read;
+pub(crate) mod write;
 
 #[cfg(test)]
 mod tests;

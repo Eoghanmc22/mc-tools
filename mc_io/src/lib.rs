@@ -4,9 +4,13 @@ use crate::buf::Buffer;
 use crate::error::CommunicationError;
 use crate::io::{read, write};
 use libdeflater::{CompressionLvl, Compressor, Decompressor};
-use packet::handle::{self, PacketHandler};
+use packet::handle;
 use proto::Packet;
 use std::io::{Read, Write};
+use std::ops::Deref;
+
+// Re-exports
+pub use packet::handle::PacketHandler;
 
 pub mod buf;
 pub mod error;
@@ -27,15 +31,19 @@ impl<'a> From<RawPacket<'a>> for &'a [u8] {
 const MAXIMUM_PACKET_SIZE: usize = 2097148;
 
 #[derive(Clone, Debug)]
-pub struct ConnectionReadContext<S: Read> {
+pub struct ConnectionReadContext<D> {
     pub compression_threshold: i32,
-    pub socket: S,
+    pub socket: D,
     // TODO would smallvec or similar be better?
     pub unread_buf: Buffer,
 }
 
-impl<S: Read> ConnectionReadContext<S> {
-    pub fn new(socket: S) -> Self {
+impl<D, S> ConnectionReadContext<D>
+where
+    D: Deref<Target = S>,
+    for<'a> &'a S: Read,
+{
+    pub fn new(socket: D) -> Self {
         Self {
             compression_threshold: -1,
             socket,
@@ -65,16 +73,20 @@ impl<S: Read> ConnectionReadContext<S> {
 }
 
 #[derive(Clone, Debug)]
-pub struct ConnectionWriteContext<S: Write> {
+pub struct ConnectionWriteContext<D> {
     pub compression_threshold: i32,
-    pub socket: S,
+    pub socket: D,
     // TODO would smallvec or similar be better?
     pub unwritten_buf: Buffer,
     pub writeable: bool,
 }
 
-impl<S: Write> ConnectionWriteContext<S> {
-    pub fn new(socket: S) -> Self {
+impl<D, S> ConnectionWriteContext<D>
+where
+    D: Deref<Target = S>,
+    for<'a> &'a S: Write,
+{
+    pub fn new(socket: D) -> Self {
         Self {
             compression_threshold: -1,
             socket,
@@ -99,11 +111,15 @@ impl<S: Write> ConnectionWriteContext<S> {
 
     pub fn write_slice(&mut self, to_write: &[u8]) -> Result<(), CommunicationError> {
         write::write_slice(
-            &mut self.socket,
+            D::deref(&self.socket),
             to_write,
             &mut self.unwritten_buf,
             &mut self.writeable,
         )
+    }
+
+    pub fn write_unwritten(&mut self) -> Result<(), CommunicationError> {
+        write::write_unwritten(self)
     }
 }
 

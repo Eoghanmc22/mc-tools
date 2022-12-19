@@ -5,7 +5,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent};
 use crate::threading::{ConsoleMessage, Worker};
 
 #[derive(Default, Debug, Clone)]
-pub struct App {
+pub struct App<'a> {
     pub bots: u64,
     pub bot_count_data: Vec<(f64, f64)>,
     pub bandwidth_in_data: Vec<(f64, f64)>,
@@ -24,12 +24,12 @@ pub struct App {
 
     pub server: String,
 
-    workers: Vec<Worker>,
+    workers: &'a [Worker],
     tick: u64,
 }
 
-impl App {
-    pub fn new(workers: Vec<Worker>, server: String) -> Self {
+impl<'a> App<'a> {
+    pub fn new(workers: &'a [Worker], server: String) -> Self {
         Self {
             workers,
             server,
@@ -64,7 +64,7 @@ impl App {
         let mut packets_tx_next = 0;
         let mut packets_rx_next = 0;
 
-        for worker in &self.workers {
+        for worker in self.workers {
             for message in worker.console_bound.1.try_iter() {
                 match message {
                     ConsoleMessage::BotConnected => {
