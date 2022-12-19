@@ -10,7 +10,7 @@ use mio::{Events, Interest, Poll, Token, Waker};
 use proto::packets::c2s::handshake::HandshakePacket;
 use proto::packets::c2s::login::{LoginProtoC2S, LoginStartPacket};
 use std::collections::HashMap;
-use std::io::ErrorKind;
+use std::io::{ErrorKind, Read, Write};
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -21,7 +21,7 @@ const WAKER_TOKEN: Token = Token(0);
 
 static NEXT_TOKEN: AtomicUsize = AtomicUsize::new(1);
 
-type Backend = TcpStream;
+type Backend<'a> = LoggedStream<'a>;
 
 pub struct BotContext {
     poll: Poll,
@@ -57,7 +57,7 @@ pub fn start(ctx: BotContext, args: &Args, worker: Worker) -> anyhow::Result<()>
                         match message {
                             BotMessage::ConnectBot(username) => {
                                 let Some((token, player)) =
-                                    create_bot(&mut poll, args.server.0, username) 
+                                    create_bot(&mut poll, args.server.0, username, &worker) 
                                 else {
                                         continue;
                                     };
@@ -118,14 +118,15 @@ pub fn start(ctx: BotContext, args: &Args, worker: Worker) -> anyhow::Result<()>
     }
 }
 
-fn create_bot(
+fn create_bot<'a>(
     poll: &mut Poll,
     server: SocketAddr,
     username: String,
-) -> Option<(Token, Player<Backend>)> {
+    worker: &'a Worker
+) -> Option<(Token, Player<Backend<'a>>)> {
     info!("Starting Bot: {}", username);
 
-    let mut stream = match Backend::connect(server) {
+    let mut stream = match TcpStream::connect(server) {
         Ok(stream) => stream,
         Err(error) => {
             warn!("Could not open socket for Bot {}: {}", username, error);
@@ -139,19 +140,20 @@ fn create_bot(
         .register(&mut stream, token, Interest::READABLE | Interest::WRITABLE)
         .expect("Register");
 
+    let stream = LoggedStream(stream, &worker);
     let player = Player::new(stream, username);
 
     Some((token, player))
 }
 
 fn connect_bot(player: &mut Player<Backend>, server: SocketAddr, ctx: &mut GlobalWriteContext, worker: &Worker) -> Result<(), CommunicationError> {
-    match player.socket.peer_addr() {
+    match player.socket.0.peer_addr() {
         Err(err) if err.kind() == ErrorKind::NotConnected => return Ok(()),
         Err(err) => return Err(err.into()),
         _ => (),
     }
 
-    player.socket.set_nodelay(true)?;
+    player.socket.0.set_nodelay(true)?;
 
     let handshake = HandshakePacket {
         protocol_version: PROTOCOL_VERSION,
@@ -180,4 +182,80 @@ fn handle_error<S>(player: &mut Player<S>, error: CommunicationError, worker: &W
 
     warn!("Bot disconnected {}: {}", player.username, error);
     worker.console_bound.0.send(ConsoleMessage::BotDisconnected).expect("Send msg");
+}
+
+struct LoggedStream<'a>(pub TcpStream, pub &'a Worker);
+
+impl<'a> Read for LoggedStream<'a> {
+    // fn read_vectored(&mut self, bufs: &mut [std::io::IoSliceMut<'_>]) -> std::io::Result<usize> {
+    //     self.0.read_vectored(bufs)
+    // }
+
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        match self.0.read(buf) {
+            Ok(amount) => {
+                self.1.bytes_rx.fetch_add(amount as u64, Ordering::Relaxed);
+                Ok(amount)
+            },
+            Err(err) => Err(err)
+        }
+    }
+}
+
+impl<'a> Write for LoggedStream<'a> {
+    // fn write_vectored(&mut self, bufs: &[std::io::IoSlice<'_>]) -> std::io::Result<usize> {
+    //     self.0.write_vectored(bufs)
+    // }
+
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        match self.0.write(buf) {
+            Ok(amount) => {
+                self.1.bytes_tx.fetch_add(amount as u64, Ordering::Relaxed);
+                Ok(amount)
+            },
+            Err(err) => Err(err)
+        }
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.0.flush()
+    }
+
+}
+
+impl<'a> Read for &LoggedStream<'a> {
+    // fn read_vectored(&mut self, bufs: &mut [std::io::IoSliceMut<'_>]) -> std::io::Result<usize> {
+    //     self.0.read_vectored(bufs)
+    // }
+
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        match (&self.0).read(buf) {
+            Ok(amount) => {
+                self.1.bytes_rx.fetch_add(amount as u64, Ordering::Relaxed);
+                Ok(amount)
+            },
+            Err(err) => Err(err)
+        }
+    }
+}
+
+impl<'a> Write for &LoggedStream<'a> {
+    // fn write_vectored(&mut self, bufs: &[std::io::IoSlice<'_>]) -> std::io::Result<usize> {
+    //     self.0.write_vectored(bufs)
+    // }
+
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        match (&self.0).write(buf) {
+            Ok(amount) => {
+                self.1.bytes_tx.fetch_add(amount as u64, Ordering::Relaxed);
+                Ok(amount)
+            },
+            Err(err) => Err(err)
+        }
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        (&self.0).flush()
+    }
+
 }

@@ -25,7 +25,7 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 const TICK_DURATION: Duration = Duration::from_millis(50);
 
 // A way to stop everything, motd, implement cached reading (hash first few bytes and lookup in some kind
-// of hash map), implement tps monetering, make ui more colerful, implement bots.rs
+// of hash map), implement tps monetering, make ui more colerful, use write/read vectored
 fn main() -> anyhow::Result<()> {
     tui_logger::init_logger(LevelFilter::Info).unwrap();
 
