@@ -22,14 +22,17 @@ pub struct App {
     pub should_quit: bool,
     pub show_help: bool,
 
+    pub server: String,
+
     workers: Vec<Worker>,
     tick: u64,
 }
 
 impl App {
-    pub fn new(workers: Vec<Worker>) -> Self {
+    pub fn new(workers: Vec<Worker>, server: String) -> Self {
         Self {
             workers,
+            server,
             ..Default::default()
         }
     }

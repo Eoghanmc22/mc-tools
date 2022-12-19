@@ -21,6 +21,8 @@ mod threading;
 const NAME: &str = env!("CARGO_PKG_NAME");
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+// motd, implement cached reading (hash first few bytes and lookup in some kind
+// of hash map), implement tps monetering, make ui more colerful, implement bots.rs
 fn main() -> anyhow::Result<()> {
     tui_logger::init_logger(LevelFilter::Info).unwrap();
 

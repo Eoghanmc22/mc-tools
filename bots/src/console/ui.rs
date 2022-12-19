@@ -50,8 +50,8 @@ fn draw_stats<B: Backend>(f: &mut Frame<B>, app: &mut App, area: Rect) {
     f.render_widget(block, area);
 
     let message = format!(
-        "Bots connected: {:6}, Bytes tx: {}, Bytes rx: {}, Packets tx: {:6}, Packets rx: {:6}",
-        app.bots, app.bytes_tx, app.bytes_rx, app.packets_tx, app.packets_rx
+        "Server: {}, Bots connected: {:6}, Bytes tx: {}, Bytes rx: {}, Packets tx: {:6}, Packets rx: {:6}",
+        app.server, app.bots, app.bytes_tx, app.bytes_rx, app.packets_tx, app.packets_rx
     );
     let status = Paragraph::new(message).block(Block::default().title("Status:"));
     f.render_widget(status, chunks[0]);

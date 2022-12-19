@@ -28,7 +28,7 @@ pub fn start(args: Args, workers: Vec<Worker>) -> anyhow::Result<()> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let app = App::new(workers);
+    let app = App::new(workers, args.server.0.to_string());
     let res = run_app(&mut terminal, app, args);
 
     // Restore Terminal
