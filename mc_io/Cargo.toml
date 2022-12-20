@@ -14,3 +14,4 @@ proto = { path = "../proto" }
 libdeflater = "0.11"
 
 thiserror = "1"
+log = "0.4"

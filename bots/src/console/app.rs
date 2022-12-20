@@ -92,6 +92,11 @@ impl<'a> App<'a> {
         self.bandwidth_out_data
             .push((self.tick as f64, bandwidth_tx as f64));
 
+        let lower = self.bot_count_data.len().max(100) - 100;
+        self.bot_count_data.drain(0..lower);
+        self.bandwidth_in_data.drain(0..lower);
+        self.bandwidth_out_data.drain(0..lower);
+
         self.bytes_tx = Bytes(bytes_tx_next);
         self.bytes_rx = Bytes(bytes_rx_next);
 
@@ -108,13 +113,13 @@ impl<'a> App<'a> {
 pub struct Bytes(pub u64);
 impl Display for Bytes {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let prefix = number_prefix::NumberPrefix::binary(self.0 as f64);
+        let prefix = number_prefix::NumberPrefix::binary(self.0 as f64 * 8.0);
         match prefix {
             number_prefix::NumberPrefix::Standalone(num) => {
-                write!(f, "{:5.0} bytes", num)
+                write!(f, "{:5.0} bits", num)
             }
             number_prefix::NumberPrefix::Prefixed(prefix, num) => {
-                write!(f, "{:7.2} {:2}B", num, prefix)
+                write!(f, "{:7.2} {:2}b", num, prefix)
             }
         }
     }

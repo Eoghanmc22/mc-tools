@@ -24,10 +24,19 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 const TICK_DURATION: Duration = Duration::from_millis(50);
 
+const CONEOLE_UI: bool = true;
+
 // A way to stop everything, motd, implement cached reading (hash first few bytes and lookup in some kind
-// of hash map), implement tps monetering, make ui more colerful, use write/read vectored
+// of hash map), implement tps monetering, make ui more colerful, use write/read vectored, ipv6
+// support, steal graphs from bottom, batch pachet sending, optimize
 fn main() -> anyhow::Result<()> {
-    tui_logger::init_logger(LevelFilter::Info).unwrap();
+    if CONEOLE_UI {
+        tui_logger::init_logger(LevelFilter::Info).unwrap();
+    } else {
+        env_logger::builder()
+            .filter_level(LevelFilter::Trace)
+            .init();
+    }
 
     info!("Starting {} - {}", NAME, VERSION);
 
@@ -74,9 +83,11 @@ fn main() -> anyhow::Result<()> {
         }
 
         // Console ui
-        s.spawn(|| {
-            console::start(&args, &workers).expect("Run console");
-        });
+        if CONEOLE_UI {
+            s.spawn(|| {
+                console::start(&args, &workers).expect("Run console");
+            });
+        }
 
         // Bot spawner
         s.spawn(|| {
@@ -92,6 +103,8 @@ fn main() -> anyhow::Result<()> {
                     .expect("Send msg");
 
                 worker.waker.as_ref().unwrap().wake().unwrap();
+
+                thread::sleep(Duration::from_millis(args.bot_join_rate));
             }
         });
 
@@ -105,7 +118,7 @@ fn main() -> anyhow::Result<()> {
                 }
 
                 tick += TICK_DURATION;
-                let delay = Instant::now() - tick;
+                let delay = tick - Instant::now();
                 thread::sleep(delay);
             }
         });

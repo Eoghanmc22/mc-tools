@@ -34,7 +34,7 @@ pub struct Args {
     pub threads: usize,
     #[clap(
         short = 'n',
-        default_value = "200",
+        default_value = "500",
         help = "Time in ms between ui updates"
     )]
     pub ui_update_rate: u64,

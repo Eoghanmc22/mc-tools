@@ -73,12 +73,12 @@ pub fn write_packet<'a, 'b, P>(
     packet: &'a P,
     packet_buf: &mut Buffer,
     ctx: CompressionWriteContext,
+    compression_threshold: i32,
 ) -> Result<(), WriteError>
 where
     P: Packet<'a>,
 {
     let CompressionWriteContext {
-        compression_threshold,
         compression_buf,
         compressor,
         ..
@@ -100,11 +100,13 @@ where
         1 + expected_packet_size,
         compression_threshold,
     );
-    write_buf[0] = P::PACKET_ID_NUM;
 
-    // SAFETY: We allocated at least `T::get_write_size` bytes
+    let pre_write_len = write_buf.len();
+
+    write_buf[0] = P::PACKET_ID_NUM;
     let slice_after_write = packet.encode(&mut write_buf[1..]);
-    let packet_size = 1 + expected_packet_size - slice_after_write.len();
+
+    let packet_size = pre_write_len - slice_after_write.len();
 
     match packet_type {
         PacketType::Compressed(total_len, data_len, dst) => {
@@ -142,9 +144,9 @@ where
 pub fn read_packet<'a>(
     packet: &'a FramedPacket,
     ctx: CompressionReadContext<'a, '_>,
+    compression_threshold: i32,
 ) -> Result<RawPacket<'a>, ReadError> {
     let CompressionReadContext {
-        compression_threshold,
         compression_buf,
         decompressor,
         ..

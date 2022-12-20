@@ -6,6 +6,7 @@ use crate::io::{read, write};
 use libdeflater::{CompressionLvl, Compressor, Decompressor};
 use packet::handle;
 use proto::Packet;
+use std::fmt::Debug;
 use std::io::{Read, Write};
 use std::ops::Deref;
 
@@ -30,9 +31,8 @@ impl<'a> From<RawPacket<'a>> for &'a [u8] {
 
 const MAXIMUM_PACKET_SIZE: usize = 2097148;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct ConnectionReadContext<D> {
-    pub compression_threshold: i32,
     pub socket: D,
     // TODO would smallvec or similar be better?
     pub unread_buf: Buffer,
@@ -45,7 +45,6 @@ where
 {
     pub fn new(socket: D) -> Self {
         Self {
-            compression_threshold: -1,
             socket,
             unread_buf: Buffer::new(),
         }
@@ -72,9 +71,16 @@ where
     }
 }
 
-#[derive(Clone, Debug)]
+impl<D> Debug for ConnectionReadContext<D> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ConnectionReadContext")
+            .field("unread_buf", &self.unread_buf)
+            .finish_non_exhaustive()
+    }
+}
+
+#[derive(Clone)]
 pub struct ConnectionWriteContext<D> {
-    pub compression_threshold: i32,
     pub socket: D,
     // TODO would smallvec or similar be better?
     pub unwritten_buf: Buffer,
@@ -88,10 +94,9 @@ where
 {
     pub fn new(socket: D) -> Self {
         Self {
-            compression_threshold: -1,
             socket,
             unwritten_buf: Buffer::new(),
-            writeable: false,
+            writeable: true,
         }
     }
 
@@ -99,9 +104,10 @@ where
         &mut self,
         packet: &'a P,
         ctx: &mut GlobalWriteContext,
+        compression_threshold: i32,
     ) -> Result<(), CommunicationError> {
-        let (write_buf, compression_ctx) = ctx.compression(self.compression_threshold);
-        packet::helpers::write_packet(packet, write_buf, compression_ctx)?;
+        let (write_buf, compression_ctx) = ctx.compression();
+        packet::helpers::write_packet(packet, write_buf, compression_ctx, compression_threshold)?;
         Ok(self.write_buffer(write_buf)?)
     }
 
@@ -123,6 +129,15 @@ where
     }
 }
 
+impl<D> Debug for ConnectionWriteContext<D> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ConnectionWriteContext")
+            .field("unwritten_buf", &self.unwritten_buf)
+            .field("writeable", &self.writeable)
+            .finish_non_exhaustive()
+    }
+}
+
 pub struct GlobalReadContext {
     pub read_buf: Buffer,
     pub compression_buf: Buffer,
@@ -139,15 +154,11 @@ impl GlobalReadContext {
         }
     }
 
-    pub fn decompression(
-        &mut self,
-        compression_threshold: i32,
-    ) -> (&mut Buffer, CompressionReadContext) {
+    pub fn decompression(&mut self) -> (&mut Buffer, CompressionReadContext) {
         self.reset();
         (
             &mut self.read_buf,
             CompressionReadContext {
-                compression_threshold,
                 compression_buf: &mut self.compression_buf,
                 decompressor: &mut self.decompressor,
             },
@@ -163,6 +174,15 @@ impl GlobalReadContext {
 impl Default for GlobalReadContext {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl Debug for GlobalReadContext {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GlobalReadContext")
+            .field("write_buf", &self.read_buf)
+            .field("compression_buf", &self.compression_buf)
+            .finish_non_exhaustive()
     }
 }
 
@@ -182,10 +202,7 @@ impl GlobalWriteContext {
         }
     }
 
-    pub fn compression(
-        &mut self,
-        compression_threshold: i32,
-    ) -> (&mut Buffer, CompressionWriteContext) {
+    pub fn compression(&mut self) -> (&mut Buffer, CompressionWriteContext) {
         self.reset();
 
         let compressor = if let Some(ref mut compressor) = self.compressor {
@@ -198,7 +215,6 @@ impl GlobalWriteContext {
         (
             &mut self.write_buf,
             CompressionWriteContext {
-                compression_threshold,
                 compression_buf: &mut self.compression_buf,
                 compressor,
             },
@@ -211,6 +227,15 @@ impl GlobalWriteContext {
     }
 }
 
+impl Debug for GlobalWriteContext {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GlobalWriteContext")
+            .field("write_buf", &self.write_buf)
+            .field("compression_buf", &self.compression_buf)
+            .finish_non_exhaustive()
+    }
+}
+
 impl Default for GlobalWriteContext {
     fn default() -> Self {
         Self::new()
@@ -218,17 +243,29 @@ impl Default for GlobalWriteContext {
 }
 
 pub struct CompressionReadContext<'a, 'b> {
-    pub compression_threshold: i32,
-
     pub compression_buf: &'a mut Buffer,
 
     pub decompressor: &'b mut Decompressor,
 }
 
-pub struct CompressionWriteContext<'a, 'b> {
-    pub compression_threshold: i32,
+impl Debug for CompressionReadContext<'_, '_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CompressionReadContext")
+            .field("compression_buf", &self.compression_buf)
+            .finish_non_exhaustive()
+    }
+}
 
+pub struct CompressionWriteContext<'a, 'b> {
     pub compression_buf: &'a mut Buffer,
 
     pub compressor: &'b mut Compressor,
+}
+
+impl Debug for CompressionWriteContext<'_, '_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CompressionWriteContext")
+            .field("compression_buf", &self.compression_buf)
+            .finish_non_exhaustive()
+    }
 }

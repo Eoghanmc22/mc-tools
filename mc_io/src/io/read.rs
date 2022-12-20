@@ -1,3 +1,4 @@
+use log::info;
 use proto::primitive::V21;
 use proto::Data;
 
@@ -27,11 +28,7 @@ where
         compression_buf,
         decompressor,
     } = ctx;
-    let ConnectionReadContext {
-        compression_threshold,
-        socket,
-        unread_buf,
-    } = connection;
+    let ConnectionReadContext { socket, unread_buf } = connection;
 
     read_buf.reset();
 
@@ -44,7 +41,6 @@ where
 
         while let DecodeResult::Packet(packet, network_len) = next_packet(read_buf.get_written())? {
             let compression_ctx = CompressionReadContext {
-                compression_threshold: *compression_threshold,
                 compression_buf,
                 decompressor,
             };

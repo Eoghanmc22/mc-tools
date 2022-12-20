@@ -73,6 +73,12 @@ fn draw_graphs<B: Backend>(f: &mut Frame<B>, app: &mut App, area: Rect) {
 }
 
 fn draw_players<B: Backend>(f: &mut Frame<B>, app: &mut App, area: Rect) {
+    let time_min = app
+        .bot_count_data
+        .iter()
+        .map(|(x, _)| *x as u64)
+        .min()
+        .unwrap_or(0);
     let time_max = app
         .bot_count_data
         .iter()
@@ -95,7 +101,7 @@ fn draw_players<B: Backend>(f: &mut Frame<B>, app: &mut App, area: Rect) {
         Axis::default()
             .title(Span::styled("Time", Style::default().fg(Color::Red)))
             .style(Style::default().fg(Color::White))
-            .bounds([0.0, time_max as f64]),
+            .bounds([time_min as f64, time_max as f64]),
     )
     .y_axis(
         Axis::default()
@@ -117,6 +123,12 @@ fn draw_players<B: Backend>(f: &mut Frame<B>, app: &mut App, area: Rect) {
 }
 
 fn draw_bandwidth<B: Backend>(f: &mut Frame<B>, app: &mut App, area: Rect) {
+    let time_min = app
+        .bandwidth_in_data
+        .iter()
+        .map(|(x, _)| *x as u64)
+        .min()
+        .unwrap_or(0);
     let time_max = app
         .bandwidth_in_data
         .iter()
@@ -156,7 +168,7 @@ fn draw_bandwidth<B: Backend>(f: &mut Frame<B>, app: &mut App, area: Rect) {
         Axis::default()
             .title(Span::styled("Time", Style::default().fg(Color::Red)))
             .style(Style::default().fg(Color::White))
-            .bounds([0.0, time_max as f64]),
+            .bounds([time_min as f64, time_max as f64]),
     )
     .y_axis(
         Axis::default()

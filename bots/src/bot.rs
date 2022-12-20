@@ -4,19 +4,21 @@ use crate::{threading::BotMessage, Args};
 use anyhow::Context;
 use log::{warn, info, error};
 use mc_io::error::CommunicationError;
-use mc_io::{GlobalReadContext, GlobalWriteContext};
+use mc_io::{GlobalReadContext, GlobalWriteContext, PacketHandler};
 use mio::net::TcpStream;
 use mio::{Events, Interest, Poll, Token, Waker};
 use proto::packets::c2s::handshake::HandshakePacket;
 use proto::packets::c2s::login::{LoginProtoC2S, LoginStartPacket};
+use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::io::{ErrorKind, Read, Write};
 use std::mem;
 use std::net::SocketAddr;
+use std::ops::Deref;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
-const PROTOCOL_VERSION: u32 = 759;
+const PROTOCOL_VERSION: u32 = 760;
 
 const WAKER_TOKEN: Token = Token(0);
 
@@ -111,13 +113,6 @@ pub fn start(ctx: BotContext, args: &Args, worker: Worker) -> anyhow::Result<()>
 
                                 player.ctx_read = Some(player_read);
 
-                                if let Some(threshold) = player.compression_threshold_dirty {
-                                    player.ctx_write.compression_threshold = threshold;
-                                    if let Some(ref mut player_read) = player.ctx_read {
-                                        player_read.compression_threshold = threshold;
-                                    }
-                                }
-
                                 if let Some(g_ctx_write) = player.g_ctx_write.take() {
                                     ctx_write = g_ctx_write;
                                 } else {
@@ -150,7 +145,7 @@ fn create_bot<'a>(
         }
     };
 
-    let token = Token(NEXT_TOKEN.fetch_and(1, Ordering::Relaxed));
+    let token = Token(NEXT_TOKEN.fetch_add(1, Ordering::Relaxed));
 
     poll.registry()
         .register(&mut stream, token, Interest::READABLE | Interest::WRITABLE)
@@ -171,6 +166,7 @@ fn connect_bot(player: &mut Player<Backend>, server: SocketAddr, ctx: &mut Globa
 
     player.socket.0.set_nodelay(true)?;
 
+
     let handshake = HandshakePacket {
         protocol_version: PROTOCOL_VERSION,
         server_address: &server.ip().to_string(),
@@ -184,11 +180,13 @@ fn connect_bot(player: &mut Player<Backend>, server: SocketAddr, ctx: &mut Globa
         uuid: None,
     };
 
-    player.ctx_write.write_packet(&handshake, ctx)?;
-    player.ctx_write.write_packet(&login_start, ctx)?;
+    player.ctx_write.write_packet(&handshake, ctx, player.compression_threshold)?;
+    player.ctx_write.write_packet(&login_start, ctx, player.compression_threshold)?;
 
     info!("Bot Connected: {}", player.username);
     worker.console_bound.0.send(ConsoleMessage::BotConnected).expect("Send msg");
+
+    player.connected = true;
 
     Ok(())
 }
@@ -245,6 +243,7 @@ impl<'a> Read for &LoggedStream<'a> {
     // }
 
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        // info!("R");
         match (&self.0).read(buf) {
             Ok(amount) => {
                 self.1.bytes_rx.fetch_add(amount as u64, Ordering::Relaxed);
@@ -261,6 +260,7 @@ impl<'a> Write for &LoggedStream<'a> {
     // }
 
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        // info!("W");
         match (&self.0).write(buf) {
             Ok(amount) => {
                 self.1.bytes_tx.fetch_add(amount as u64, Ordering::Relaxed);
@@ -268,6 +268,7 @@ impl<'a> Write for &LoggedStream<'a> {
             },
             Err(err) => Err(err)
         }
+
     }
 
     fn flush(&mut self) -> std::io::Result<()> {

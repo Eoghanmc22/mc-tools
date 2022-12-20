@@ -31,7 +31,7 @@ pub fn compress<'a>(
 }
 
 pub fn decompress<'a>(
-    mut src: &[u8],
+    mut src: &'a [u8],
     dst: &'a mut Buffer,
     decompressor: &mut Decompressor,
     compression_threshold: i32,
@@ -40,6 +40,10 @@ pub fn decompress<'a>(
 
     if data_len > MAXIMUM_PACKET_SIZE {
         return Err(ReadError::PacketTooLarge);
+    }
+
+    if data_len == 0 {
+        return Ok(src);
     }
 
     if data_len < compression_threshold as usize {
@@ -96,4 +100,3 @@ mod tests {
         assert_eq!(compression_buffer.len(), compressed_len);
     }
 }
-

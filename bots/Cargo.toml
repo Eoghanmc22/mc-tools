@@ -26,6 +26,7 @@ crossbeam = "0.8"
 # Logging
 log = "0.4"
 tui-logger = "0.8"
+env_logger = "0.10"
 
 # Misc
 rand = "0.8"

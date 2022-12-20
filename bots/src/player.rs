@@ -1,5 +1,6 @@
 use std::{
     io::{Read, Write},
+    ops::Mul,
     sync::Arc,
 };
 
@@ -35,8 +36,8 @@ pub struct Player<S> {
     pub connected: bool,
     pub should_tick: bool,
     pub kicked: bool,
-    // TODO remove
-    pub compression_threshold_dirty: Option<i32>,
+
+    pub compression_threshold: i32,
 
     pub position: Point3D<f64>,
     pub velocity: Vector3D<f64>,
@@ -50,6 +51,7 @@ where
 {
     pub fn new(stream: S, username: String) -> Self {
         let stream = Arc::new(stream);
+        let velocity = (rand::random(), rand::random());
 
         Self {
             socket: stream.clone(),
@@ -62,10 +64,12 @@ where
             should_tick: false,
             kicked: false,
             position: Default::default(),
-            velocity: Default::default(),
+            velocity: Vector3D::new(velocity.0, 0.0, velocity.1)
+                .normalize()
+                .mul(0.2),
             state: LoginProtoS2C::PROTOCOL_ID,
             uuid: 0,
-            compression_threshold_dirty: None,
+            compression_threshold: -1,
             g_ctx_write: None,
         }
     }
@@ -97,7 +101,8 @@ where
             yaw: 0.0,
             pitch: 0.0,
         };
-        self.ctx_write.write_packet(&move_packet, ctx)?;
+        self.ctx_write
+            .write_packet(&move_packet, ctx, self.compression_threshold)?;
 
         // TODO: Implement random actions
 
@@ -116,6 +121,10 @@ where
             PlayProtoS2C::PROTOCOL_ID => self.parse_and_handle_play_proto_s2_c(packet),
             _ => Err(ReadError::BadProtocolState.into()),
         }
+    }
+
+    fn compression_threshold(&self) -> i32 {
+        self.compression_threshold
     }
 }
 
@@ -144,7 +153,7 @@ where
         packet: login::LoginSuccessPacket,
     ) -> Result<(), Self::Error> {
         self.uuid = packet.uuid;
-        self.username = packet.username.to_owned();
+        // self.username = packet.username.to_owned();
         self.state = PlayProtoS2C::PROTOCOL_ID;
 
         Ok(())
@@ -154,7 +163,7 @@ where
         &mut self,
         packet: login::SetCompressionPacket,
     ) -> Result<(), Self::Error> {
-        self.compression_threshold_dirty = Some(packet.threshold);
+        self.compression_threshold = packet.threshold;
 
         Ok(())
     }
@@ -185,8 +194,11 @@ where
         packet: play::KeepAlivePacket,
     ) -> Result<(), Self::Error> {
         if let Some(ref mut ctx) = self.g_ctx_write {
-            self.ctx_write
-                .write_packet(&c2s::play::KeepAlivePacket { id: packet.id }, ctx)?;
+            self.ctx_write.write_packet(
+                &c2s::play::KeepAlivePacket { id: packet.id },
+                ctx,
+                self.compression_threshold,
+            )?;
         }
 
         Ok(())
@@ -208,6 +220,7 @@ where
                     allow_server_listings: true,
                 },
                 ctx,
+                self.compression_threshold,
             )?;
         }
 
@@ -232,9 +245,14 @@ where
         }
 
         if let Some(ref mut ctx) = self.g_ctx_write {
-            self.ctx_write
-                .write_packet(&c2s::play::TeleportConfirmPacket { id: packet.id }, ctx)?;
+            self.ctx_write.write_packet(
+                &c2s::play::TeleportConfirmPacket { id: packet.id },
+                ctx,
+                self.compression_threshold,
+            )?;
         }
+
+        self.should_tick = true;
 
         Ok(())
     }
