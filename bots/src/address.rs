@@ -1,4 +1,4 @@
-use std::io;
+use std::io::{self, ErrorKind};
 use std::net::{SocketAddr, ToSocketAddrs};
 use std::str::FromStr;
 
@@ -10,8 +10,11 @@ impl FromStr for MinecraftAddress {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         s.to_socket_addrs()
-            .or_else(|_| (s, 25565).to_socket_addrs())
-            .map(|mut iter| iter.next().unwrap())
+            .or_else(|_| (s, 25565).to_socket_addrs())?
+            .into_iter()
+            .filter(|it| it.is_ipv4())
             .map(MinecraftAddress)
+            .next()
+            .ok_or_else(|| ErrorKind::NotFound.into())
     }
 }
