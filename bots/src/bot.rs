@@ -1,8 +1,8 @@
 use crate::player::Player;
-use crate::threading::{Worker, ConsoleMessage};
+use crate::threading::{ConsoleMessage, Worker};
 use crate::{threading::BotMessage, Args};
 use anyhow::Context;
-use log::{warn, info, error};
+use log::{error, info, warn};
 use mc_io::error::CommunicationError;
 use mc_io::{GlobalReadContext, GlobalWriteContext};
 use mio::net::TcpStream;
@@ -59,12 +59,11 @@ pub fn start(ctx: BotContext, args: &Args, worker: Worker) -> anyhow::Result<()>
                     for message in worker.bot_bound.1.try_iter() {
                         match message {
                             BotMessage::ConnectBot(username) => {
-                                let Some((token, player)) =
-                                    create_bot(&mut poll, args.server.0, username, &worker) 
-                                else {
-                                        continue;
-                                    };
-                                players.insert(token, player);
+                                if let Some((token, player)) =
+                                    create_bot(&mut poll, args.server.0, username, &worker)
+                                {
+                                    players.insert(token, player);
+                                }
                             }
                             BotMessage::Tick => {
                                 for player in players.values_mut() {
@@ -133,7 +132,7 @@ fn create_bot<'a>(
     poll: &mut Poll,
     server: SocketAddr,
     username: String,
-    worker: &'a Worker
+    worker: &'a Worker,
 ) -> Option<(Token, Player<Backend<'a>>)> {
     info!("Starting Bot: {}", username);
 
@@ -157,7 +156,12 @@ fn create_bot<'a>(
     Some((token, player))
 }
 
-fn connect_bot(player: &mut Player<Backend>, server: SocketAddr, ctx: &mut GlobalWriteContext, worker: &Worker) -> Result<(), CommunicationError> {
+fn connect_bot(
+    player: &mut Player<Backend>,
+    server: SocketAddr,
+    ctx: &mut GlobalWriteContext,
+    worker: &Worker,
+) -> Result<(), CommunicationError> {
     match player.socket.0.peer_addr() {
         Err(err) if err.kind() == ErrorKind::NotConnected => return Ok(()),
         Err(err) => return Err(err.into()),
@@ -165,7 +169,6 @@ fn connect_bot(player: &mut Player<Backend>, server: SocketAddr, ctx: &mut Globa
     }
 
     player.socket.0.set_nodelay(true)?;
-
 
     let handshake = HandshakePacket {
         protocol_version: PROTOCOL_VERSION,
@@ -180,11 +183,19 @@ fn connect_bot(player: &mut Player<Backend>, server: SocketAddr, ctx: &mut Globa
         uuid: None,
     };
 
-    player.ctx_write.write_packet(&handshake, ctx, player.compression_threshold)?;
-    player.ctx_write.write_packet(&login_start, ctx, player.compression_threshold)?;
+    player
+        .ctx_write
+        .write_packet(&handshake, ctx, player.compression_threshold)?;
+    player
+        .ctx_write
+        .write_packet(&login_start, ctx, player.compression_threshold)?;
 
     info!("Bot Connected: {}", player.username);
-    worker.console_bound.0.send(ConsoleMessage::BotConnected).expect("Send msg");
+    worker
+        .console_bound
+        .0
+        .send(ConsoleMessage::BotConnected)
+        .expect("Send msg");
 
     player.connected = true;
 
@@ -195,7 +206,11 @@ fn handle_error<S>(player: &mut Player<S>, error: CommunicationError, worker: &W
     player.kicked = true;
 
     warn!("Bot disconnected {}: {}", player.username, error);
-    worker.console_bound.0.send(ConsoleMessage::BotDisconnected).expect("Send msg");
+    worker
+        .console_bound
+        .0
+        .send(ConsoleMessage::BotDisconnected)
+        .expect("Send msg");
 }
 
 struct LoggedStream<'a>(pub TcpStream, pub &'a Worker);
@@ -210,8 +225,8 @@ impl<'a> Read for LoggedStream<'a> {
             Ok(amount) => {
                 self.1.bytes_rx.fetch_add(amount as u64, Ordering::Relaxed);
                 Ok(amount)
-            },
-            Err(err) => Err(err)
+            }
+            Err(err) => Err(err),
         }
     }
 }
@@ -226,15 +241,14 @@ impl<'a> Write for LoggedStream<'a> {
             Ok(amount) => {
                 self.1.bytes_tx.fetch_add(amount as u64, Ordering::Relaxed);
                 Ok(amount)
-            },
-            Err(err) => Err(err)
+            }
+            Err(err) => Err(err),
         }
     }
 
     fn flush(&mut self) -> std::io::Result<()> {
         self.0.flush()
     }
-
 }
 
 impl<'a> Read for &LoggedStream<'a> {
@@ -248,8 +262,8 @@ impl<'a> Read for &LoggedStream<'a> {
             Ok(amount) => {
                 self.1.bytes_rx.fetch_add(amount as u64, Ordering::Relaxed);
                 Ok(amount)
-            },
-            Err(err) => Err(err)
+            }
+            Err(err) => Err(err),
         }
     }
 }
@@ -265,14 +279,12 @@ impl<'a> Write for &LoggedStream<'a> {
             Ok(amount) => {
                 self.1.bytes_tx.fetch_add(amount as u64, Ordering::Relaxed);
                 Ok(amount)
-            },
-            Err(err) => Err(err)
+            }
+            Err(err) => Err(err),
         }
-
     }
 
     fn flush(&mut self) -> std::io::Result<()> {
         (&self.0).flush()
     }
-
 }
