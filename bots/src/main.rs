@@ -33,9 +33,7 @@ fn main() -> anyhow::Result<()> {
     if CONEOLE_UI {
         tui_logger::init_logger(LevelFilter::Info).unwrap();
     } else {
-        env_logger::builder()
-            .filter_level(LevelFilter::Trace)
-            .init();
+        env_logger::builder().filter_level(LevelFilter::Info).init();
     }
 
     info!("Starting {} - {}", NAME, VERSION);

@@ -5,18 +5,35 @@ use std::mem;
 
 pub use self::varint::*;
 
+impl<'a, const WIDTH: usize> Data<'a> for [u8; WIDTH] {
+    fn try_decode(buffer: &mut &'a [u8]) -> Result<Self, DecodingError> {
+        if buffer.len() < mem::size_of::<Self>() {
+            return Err(DecodingError::EOF);
+        }
+
+        let (num, remaining) = buffer.split_array_ref();
+        *buffer = remaining;
+
+        Ok(*num)
+    }
+
+    fn expected_size(&self) -> usize {
+        WIDTH
+    }
+
+    fn encode<'b>(&self, buffer: &'b mut [u8]) -> &'b mut [u8] {
+        let (num, remaining) = buffer.split_array_mut();
+        *num = *self;
+
+        remaining
+    }
+}
+
 macro_rules! impl_data_primitive {
     ($ty:ty, $bits:expr) => {
         impl<'a> Data<'a> for $ty {
             fn try_decode(buffer: &mut &'a [u8]) -> Result<Self, DecodingError> {
-                if buffer.len() < mem::size_of::<Self>() {
-                    return Err(DecodingError::EOF);
-                }
-
-                let (num, remaining) = buffer.split_array_ref();
-                *buffer = remaining;
-
-                Ok(Self::from_be_bytes(*num))
+                Ok(Self::from_be_bytes(Data::try_decode(buffer)?))
             }
 
             fn expected_size(&self) -> usize {
@@ -24,10 +41,7 @@ macro_rules! impl_data_primitive {
             }
 
             fn encode<'b>(&self, buffer: &'b mut [u8]) -> &'b mut [u8] {
-                let (num, remaining) = buffer.split_array_mut();
-                *num = self.to_be_bytes();
-
-                remaining
+                Data::encode(&self.to_be_bytes(), buffer)
             }
         }
     };

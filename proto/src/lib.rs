@@ -40,7 +40,7 @@ pub enum DecodingError {
 #[macro_export]
 macro_rules! define_proto {
     ($proto_name:ident, $proto_id:expr, $dir:expr => { $( $packet:ident $(<$life:lifetime>)? = $packet_id:expr),* }) => {
-        #[derive(Debug, num_enum::TryFromPrimitive, Eq, PartialEq)]
+        #[derive(Debug, Eq, PartialEq)]
         #[repr(u8)]
         pub enum $proto_name {
             $( $packet = $packet_id, )*
@@ -72,24 +72,23 @@ macro_rules! define_proto {
                 fn [< parse_and_handle_ $proto_name:snake >] <'a, I: Into<&'a [u8]>> (&mut self, packet: I) -> Result<(), Self::Error> {
                     let mut bytes = packet.into();
 
-                    let packet_id_byte: u8 = $crate::Data::try_decode(&mut bytes)?;
-                    if let Ok(packet_id) = $proto_name::try_from(packet_id_byte) {
-                        match packet_id {
-                            $(
-                                $proto_name::$packet => {
-                                    let packet = <$packet as $crate::Data>::try_decode(&mut bytes)?;
+                    let packet_id: u8 = $crate::Data::try_decode(&mut bytes)?;
+                    match packet_id {
+                        $(
+                            <$packet as $crate::Packet>::PACKET_ID_NUM => {
+                                let packet = <$packet as $crate::Data>::try_decode(&mut bytes)?;
 
-                                    if !bytes.is_empty() {
-                                        return Err($crate::DecodingError::DirtyBuffer(format!("{:?}", packet_id)).into())?
-                                    }
-
-                                    Ok(self.[<handle_ $packet:snake>](packet)?)
+                                if !bytes.is_empty() {
+                                    return Err($crate::DecodingError::DirtyBuffer(format!("{:?}", packet_id)).into())?
                                 }
-                            )*
+
+                                Ok(self.[<handle_ $packet:snake>](packet)?)
+                            }
+                        )*
+                        _ => {
+                            // Ignore unknown packets
+                            Ok(( ))
                         }
-                    } else {
-                        // Ignore unknown packets
-                        Ok(())
                     }
                 }
             }

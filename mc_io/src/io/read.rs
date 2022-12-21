@@ -1,4 +1,3 @@
-use log::info;
 use proto::primitive::V21;
 use proto::Data;
 
@@ -47,8 +46,10 @@ where
 
             (handler)(&packet, compression_ctx)?;
 
-            read_buf.consume(network_len);
+            read_buf.advance_read(network_len);
         }
+
+        read_buf.consume(0);
     }
 
     // Copy any unprocessed bytes into the `unread` buffer for future processing
@@ -83,7 +84,7 @@ fn socket_read<S: Read>(
 
     // SAFETY: We just put `read` bytes into the buffer
     unsafe {
-        buffer.advance(read);
+        buffer.advance_write(read);
     }
 
     Ok(ReadResult::Read(read))

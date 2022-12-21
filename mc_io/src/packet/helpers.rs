@@ -118,13 +118,13 @@ where
                     compression::compress(&write_buf[..packet_size], dst, compressor)?;
                 } else {
                     // SAFETY: We wrote a full packet into compression_buf
-                    let data = unsafe { compression_buf.advance(header_len + packet_size) };
+                    let data = unsafe { compression_buf.advance_write(header_len + packet_size) };
                     packet_buf.copy_from(data);
                 }
             } else {
                 // SAFETY: We wrote a full packet into packet_buf
                 unsafe {
-                    packet_buf.advance(header_len + packet_size);
+                    packet_buf.advance_write(header_len + packet_size);
                 }
             }
         }
@@ -133,7 +133,7 @@ where
 
             // SAFETY: We wrote a full packet into packet_buf
             unsafe {
-                packet_buf.advance(header_len + packet_size);
+                packet_buf.advance_write(header_len + packet_size);
             }
         }
     }

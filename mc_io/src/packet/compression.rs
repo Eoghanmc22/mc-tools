@@ -1,5 +1,5 @@
 use libdeflater::{Compressor, Decompressor};
-use proto::primitive::VarInt;
+use proto::primitive::V21;
 use proto::Data;
 
 use crate::packet::lazy_varint::LazyVarint;
@@ -27,7 +27,7 @@ pub fn compress<'a>(
     total_len.write(3 + compressed as i32);
 
     // SAFETY: We initialized 2 byte length headers and `compressed` bytes of data
-    Ok(unsafe { dst.advance(3 + 3 + compressed) })
+    Ok(unsafe { dst.advance_write(3 + 3 + compressed) })
 }
 
 pub fn decompress<'a>(
@@ -36,30 +36,27 @@ pub fn decompress<'a>(
     decompressor: &mut Decompressor,
     compression_threshold: i32,
 ) -> Result<&'a [u8], ReadError> {
-    let data_len = VarInt::try_decode(&mut src)?.into();
+    let data_len = V21::try_decode(&mut src)?.into();
 
     if data_len > MAXIMUM_PACKET_SIZE {
         return Err(ReadError::PacketTooLarge);
     }
 
-    if data_len == 0 {
-        return Ok(src);
+    if data_len >= compression_threshold as usize {
+        let buffer = dst.get_unwritten(data_len);
+        let decompressed = decompressor.zlib_decompress(src, buffer)?;
+
+        if decompressed == data_len {
+            // SAFETY: The decompressor wrote `decompressed` bytes
+            Ok(unsafe { dst.advance_write(decompressed) })
+        } else {
+            Err(ReadError::BadlyCompressed)
+        }
+    } else if data_len == 0 {
+        Ok(src)
+    } else {
+        Err(ReadError::BadlyCompressed)
     }
-
-    if data_len < compression_threshold as usize {
-        return Err(ReadError::BadlyCompressed);
-    }
-
-    let buffer = dst.get_unwritten(data_len);
-
-    let decompressed = decompressor.zlib_decompress(src, buffer)?;
-
-    if decompressed != data_len {
-        return Err(ReadError::BadlyCompressed);
-    }
-
-    // SAFETY: The decompressor wrote `decompressed` bytes
-    Ok(unsafe { dst.advance(decompressed) })
 }
 
 #[cfg(test)]

@@ -21,12 +21,6 @@ pub struct Args {
     )]
     pub radius: usize,
     #[clap(
-        short = 's',
-        default_value = "0.2",
-        help = "The distance each bot will move every tick"
-    )]
-    pub speed: f64,
-    #[clap(
         short = 'p',
         default_value = "0",
         help = "The number of threads to create"

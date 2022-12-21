@@ -63,7 +63,7 @@ mod tests {
         write_byte(&mut raw_buffer, 0xFF);
         varint.write(num);
 
-        let mut raw_buffer = unsafe { buffer.advance(1 + MAX_WIDTH + 1) };
+        let mut raw_buffer = unsafe { buffer.advance_write(1 + MAX_WIDTH + 1) };
 
         assert_eq!(read_byte(&mut raw_buffer), 0xFF);
         assert_eq!(
