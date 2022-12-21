@@ -108,7 +108,7 @@ where
     ) -> Result<(), CommunicationError> {
         let (write_buf, compression_ctx) = ctx.compression();
         packet::helpers::write_packet(packet, write_buf, compression_ctx, compression_threshold)?;
-        Ok(self.write_buffer(write_buf)?)
+        self.write_buffer(write_buf)
     }
 
     pub fn write_buffer(&mut self, to_write: &mut Buffer) -> Result<(), CommunicationError> {

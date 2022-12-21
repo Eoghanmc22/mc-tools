@@ -4,17 +4,17 @@ use crate::{threading::BotMessage, Args};
 use anyhow::Context;
 use log::{warn, info, error};
 use mc_io::error::CommunicationError;
-use mc_io::{GlobalReadContext, GlobalWriteContext, PacketHandler};
+use mc_io::{GlobalReadContext, GlobalWriteContext};
 use mio::net::TcpStream;
 use mio::{Events, Interest, Poll, Token, Waker};
 use proto::packets::c2s::handshake::HandshakePacket;
 use proto::packets::c2s::login::{LoginProtoC2S, LoginStartPacket};
-use std::borrow::Borrow;
+
 use std::collections::HashMap;
 use std::io::{ErrorKind, Read, Write};
 use std::mem;
 use std::net::SocketAddr;
-use std::ops::Deref;
+
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -151,7 +151,7 @@ fn create_bot<'a>(
         .register(&mut stream, token, Interest::READABLE | Interest::WRITABLE)
         .expect("Register");
 
-    let stream = LoggedStream(stream, &worker);
+    let stream = LoggedStream(stream, worker);
     let player = Player::new(stream, username);
 
     Some((token, player))

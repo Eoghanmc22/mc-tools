@@ -12,6 +12,6 @@ pub(crate) fn create_handler<'a, H: PacketHandler>(
 ) -> impl FnMut(&FramedPacket, CompressionReadContext) -> Result<(), CommunicationError> + 'a {
     |packet, ctx| {
         let packet = helpers::read_packet(packet, ctx, handler.compression_threshold())?;
-        Ok(handler.parse_and_handle(packet)?)
+        handler.parse_and_handle(packet)
     }
 }

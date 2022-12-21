@@ -50,8 +50,8 @@ mod tests {
         do_varint_roundtrip::<5>(-100000);
         do_varint_roundtrip::<5>(-10000000);
 
-        do_varint_roundtrip::<3>(0b0001_1111__1111_1111__1111_1111);
-        do_varint_roundtrip::<3>(0b0001_0000__0000_0000__0000_0000);
+        do_varint_roundtrip::<3>(0b0001_1111_1111_1111_1111_1111);
+        do_varint_roundtrip::<3>(0b0001_0000_0000_0000_0000_0000);
     }
 
     fn do_varint_roundtrip<const MAX_WIDTH: usize>(num: i32) {

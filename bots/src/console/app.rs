@@ -37,11 +37,11 @@ impl<'a> App<'a> {
         }
     }
 
-    pub fn on_mouse(&mut self, mouse: MouseEvent) {
+    pub fn on_mouse(&mut self, _mouse: MouseEvent) {
         // todo!()
     }
 
-    pub fn on_paste(&mut self, paste: String) {
+    pub fn on_paste(&mut self, _paste: String) {
         // todo!()
     }
 
@@ -88,9 +88,9 @@ impl<'a> App<'a> {
         self.bot_count_data
             .push((self.tick as f64, self.bots as f64));
         self.bandwidth_in_data
-            .push((self.tick as f64, bandwidth_rx as f64));
+            .push((self.tick as f64, bandwidth_rx));
         self.bandwidth_out_data
-            .push((self.tick as f64, bandwidth_tx as f64));
+            .push((self.tick as f64, bandwidth_tx));
 
         let lower = self.bot_count_data.len().max(100) - 100;
         self.bot_count_data.drain(0..lower);
@@ -116,10 +116,10 @@ impl Display for Bytes {
         let prefix = number_prefix::NumberPrefix::binary(self.0 as f64 * 8.0);
         match prefix {
             number_prefix::NumberPrefix::Standalone(num) => {
-                write!(f, "{:5.0} bits", num)
+                write!(f, "{num:5.0} bits")
             }
             number_prefix::NumberPrefix::Prefixed(prefix, num) => {
-                write!(f, "{:7.2} {:2}b", num, prefix)
+                write!(f, "{num:7.2} {prefix:2}b")
             }
         }
     }

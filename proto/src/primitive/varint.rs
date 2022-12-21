@@ -35,7 +35,7 @@ impl<'a, const WIDTH: usize> Data<'a> for VarNum<WIDTH> {
         let val = self.0;
 
         for position in 0..WIDTH {
-            let val = val >> position * 7;
+            let val = val >> (position * 7);
 
             let byte = val as u8 & SEGMENT_BITS;
             let continue_bit = if val & REMAINING_MASK != 0 {

@@ -93,7 +93,7 @@ fn main() -> anyhow::Result<()> {
                 let worker = i % workers.len();
                 let worker = &workers[worker];
 
-                let name = format!("Bot{}", i);
+                let name = format!("Bot{i}");
                 worker
                     .bot_bound
                     .0

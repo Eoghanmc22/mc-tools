@@ -41,7 +41,7 @@ pub fn start(args: &Args, workers: &[Worker]) -> anyhow::Result<()> {
     terminal.show_cursor()?;
 
     if let Err(err) = res {
-        println!("{:?}", err);
+        println!("{err:?}");
     }
 
     Ok(())
