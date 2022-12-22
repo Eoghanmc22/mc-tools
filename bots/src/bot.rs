@@ -24,7 +24,7 @@ const WAKER_TOKEN: Token = Token(0);
 
 static NEXT_TOKEN: AtomicUsize = AtomicUsize::new(1);
 
-type Backend<'a> = LoggedStream<'a>;
+type Backend = LoggedStream;
 
 pub struct BotContext {
     poll: Poll,
@@ -34,14 +34,12 @@ pub fn setup_bot(worker: &mut Worker) -> anyhow::Result<BotContext> {
     let poll = Poll::new().context("Create poll")?;
 
     let waker = Waker::new(poll.registry(), WAKER_TOKEN).context("Create waker")?;
-    let waker = Arc::new(waker);
-
     worker.waker = Some(waker);
 
     Ok(BotContext { poll })
 }
 
-pub fn start(ctx: BotContext, args: &Args, worker: Worker) -> anyhow::Result<()> {
+pub fn start(ctx: BotContext, args: &Args, worker: Arc<Worker>) -> anyhow::Result<()> {
     let mut poll = ctx.poll;
     let mut events = Events::with_capacity(500);
 
@@ -139,12 +137,12 @@ pub fn start(ctx: BotContext, args: &Args, worker: Worker) -> anyhow::Result<()>
     Ok(())
 }
 
-fn create_bot<'a>(
+fn create_bot(
     poll: &mut Poll,
     server: SocketAddr,
     username: String,
-    worker: &'a Worker,
-) -> Option<(Token, Player<Backend<'a>>)> {
+    worker: &Arc<Worker>,
+) -> Option<(Token, Player<Backend>)> {
     info!("Starting Bot: {}", username);
 
     let mut stream = match TcpStream::connect(server) {
@@ -161,7 +159,7 @@ fn create_bot<'a>(
         .register(&mut stream, token, Interest::READABLE | Interest::WRITABLE)
         .expect("Register");
 
-    let stream = LoggedStream(stream, worker);
+    let stream = LoggedStream(stream, worker.clone());
     let player = Player::new(stream, username);
 
     Some((token, player))
@@ -217,7 +215,7 @@ fn connect_bot(
 fn handle_error<S>(player: &mut Player<S>, error: CommunicationError, worker: &Worker) {
     player.kicked = true;
 
-    warn!("Bot disconnected {}: {}", player.username, error);
+    warn!("Bot encountered error {}: {}", player.username, error);
     worker
         .console_bound
         .0
@@ -225,13 +223,9 @@ fn handle_error<S>(player: &mut Player<S>, error: CommunicationError, worker: &W
         .expect("Send msg");
 }
 
-struct LoggedStream<'a>(pub TcpStream, pub &'a Worker);
+struct LoggedStream(pub TcpStream, pub Arc<Worker>);
 
-impl<'a> Read for LoggedStream<'a> {
-    // fn read_vectored(&mut self, bufs: &mut [std::io::IoSliceMut<'_>]) -> std::io::Result<usize> {
-    //     self.0.read_vectored(bufs)
-    // }
-
+impl Read for LoggedStream {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         match self.0.read(buf) {
             Ok(amount) => {
@@ -243,11 +237,7 @@ impl<'a> Read for LoggedStream<'a> {
     }
 }
 
-impl<'a> Write for LoggedStream<'a> {
-    // fn write_vectored(&mut self, bufs: &[std::io::IoSlice<'_>]) -> std::io::Result<usize> {
-    //     self.0.write_vectored(bufs)
-    // }
-
+impl Write for LoggedStream {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         match self.0.write(buf) {
             Ok(amount) => {
@@ -263,13 +253,8 @@ impl<'a> Write for LoggedStream<'a> {
     }
 }
 
-impl<'a> Read for &LoggedStream<'a> {
-    // fn read_vectored(&mut self, bufs: &mut [std::io::IoSliceMut<'_>]) -> std::io::Result<usize> {
-    //     self.0.read_vectored(bufs)
-    // }
-
+impl Read for &LoggedStream {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        // info!("R");
         match (&self.0).read(buf) {
             Ok(amount) => {
                 self.1.bytes_rx.fetch_add(amount as u64, Ordering::Relaxed);
@@ -280,13 +265,8 @@ impl<'a> Read for &LoggedStream<'a> {
     }
 }
 
-impl<'a> Write for &LoggedStream<'a> {
-    // fn write_vectored(&mut self, bufs: &[std::io::IoSlice<'_>]) -> std::io::Result<usize> {
-    //     self.0.write_vectored(bufs)
-    // }
-
+impl Write for &LoggedStream {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        // info!("W");
         match (&self.0).write(buf) {
             Ok(amount) => {
                 self.1.bytes_tx.fetch_add(amount as u64, Ordering::Relaxed);

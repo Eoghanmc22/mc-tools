@@ -1,4 +1,8 @@
-use std::{fmt::Display, sync::atomic::Ordering, time::Duration};
+use std::{
+    fmt::Display,
+    sync::{atomic::Ordering, Arc},
+    time::Duration,
+};
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent};
 
@@ -24,12 +28,12 @@ pub struct App<'a> {
 
     pub server: String,
 
-    workers: &'a [Worker],
+    workers: &'a [Arc<Worker>],
     tick: u64,
 }
 
 impl<'a> App<'a> {
-    pub fn new(workers: &'a [Worker], server: String) -> Self {
+    pub fn new(workers: &'a [Arc<Worker>], server: String) -> Self {
         Self {
             workers,
             server,

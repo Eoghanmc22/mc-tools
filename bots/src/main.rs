@@ -64,16 +64,18 @@ fn main() -> anyhow::Result<()> {
         // Worker threads
         for _ in 0..threads {
             let mut worker = Worker {
-                packets_tx: Arc::new(AtomicU64::new(0)),
-                packets_rx: Arc::new(AtomicU64::new(0)),
-                bytes_tx: Arc::new(AtomicU64::new(0)),
-                bytes_rx: Arc::new(AtomicU64::new(0)),
+                packets_tx: AtomicU64::new(0),
+                packets_rx: AtomicU64::new(0),
+                bytes_tx: AtomicU64::new(0),
+                bytes_rx: AtomicU64::new(0),
                 bot_bound: unbounded(),
                 console_bound: unbounded(),
                 waker: None,
             };
 
             let bot_context = bot::setup_bot(&mut worker).expect("Setup bot");
+
+            let worker = Arc::new(worker);
 
             {
                 let worker = worker.clone();

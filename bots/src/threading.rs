@@ -1,4 +1,4 @@
-use std::sync::{atomic::AtomicU64, Arc};
+use std::sync::atomic::AtomicU64;
 
 use crossbeam::channel::{Receiver, Sender};
 use mio::Waker;
@@ -14,15 +14,15 @@ pub enum BotMessage {
     Stop,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Worker {
-    pub packets_tx: Arc<AtomicU64>,
-    pub packets_rx: Arc<AtomicU64>,
-    pub bytes_tx: Arc<AtomicU64>,
-    pub bytes_rx: Arc<AtomicU64>,
+    pub packets_tx: AtomicU64,
+    pub packets_rx: AtomicU64,
+    pub bytes_tx: AtomicU64,
+    pub bytes_rx: AtomicU64,
 
     pub bot_bound: (Sender<BotMessage>, Receiver<BotMessage>),
     pub console_bound: (Sender<ConsoleMessage>, Receiver<ConsoleMessage>),
 
-    pub waker: Option<Arc<Waker>>,
+    pub waker: Option<Waker>,
 }

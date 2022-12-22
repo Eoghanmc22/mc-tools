@@ -3,7 +3,7 @@ mod ui;
 
 use std::{
     io,
-    sync::atomic::Ordering,
+    sync::{atomic::Ordering, Arc},
     time::{Duration, Instant},
 };
 
@@ -21,7 +21,7 @@ use crate::{threading::Worker, Args, STOP_THE_WORLD};
 
 use self::app::App;
 
-pub fn start(args: &Args, workers: &[Worker]) -> anyhow::Result<()> {
+pub fn start(args: &Args, workers: &[Arc<Worker>]) -> anyhow::Result<()> {
     // Setup Terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
