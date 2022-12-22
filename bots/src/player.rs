@@ -2,6 +2,7 @@ use std::{
     io::{Read, Write},
     ops::Mul,
     sync::Arc,
+    time::{Duration, Instant},
 };
 
 use euclid::default::*;
@@ -42,6 +43,11 @@ pub struct Player<S> {
     pub position: Point3D<f64>,
     pub velocity: Vector3D<f64>,
 
+    pub last_game_time: (u64, Instant),
+    pub tps: f64,
+
+    pub join_time: Option<Instant>,
+
     state: u8,
 }
 
@@ -71,6 +77,9 @@ where
             uuid: 0,
             compression_threshold: -1,
             g_ctx_write: None,
+            last_game_time: (0, Instant::now()),
+            tps: f64::NAN,
+            join_time: None,
         }
     }
 
@@ -153,7 +162,7 @@ where
         packet: login::LoginSuccessPacket,
     ) -> Result<(), Self::Error> {
         self.uuid = packet.uuid;
-        // self.username = packet.username.to_owned();
+        self.username = packet.username.to_owned();
         self.state = PlayProtoS2C::PROTOCOL_ID;
 
         Ok(())
@@ -253,6 +262,24 @@ where
         }
 
         self.should_tick = true;
+
+        Ok(())
+    }
+
+    fn handle_time_packet(&mut self, packet: play::TimePacket) -> Result<(), Self::Error> {
+        let next = (packet.world_age, Instant::now());
+        let last = self.last_game_time;
+
+        let elapsed = next.1 - last.1;
+        let tps = (next.0 - last.0) as f64 / elapsed.as_secs_f64();
+
+        self.last_game_time = next;
+
+        if let Some(join_time) = self.join_time {
+            if join_time.elapsed() > Duration::from_millis(100) {
+                self.tps = tps.min(20.0);
+            }
+        }
 
         Ok(())
     }

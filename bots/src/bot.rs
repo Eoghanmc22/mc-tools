@@ -17,6 +17,7 @@ use std::net::SocketAddr;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::time::Instant;
 
 const PROTOCOL_VERSION: u32 = 760;
 
@@ -48,6 +49,8 @@ pub fn start(ctx: BotContext, args: &Args, worker: Arc<Worker>) -> anyhow::Resul
 
     let mut players = HashMap::new();
 
+    let mut last_tick = Instant::now();
+
     'main_loop: loop {
         poll.poll(&mut events, None).context("Poll")?;
 
@@ -64,13 +67,31 @@ pub fn start(ctx: BotContext, args: &Args, worker: Arc<Worker>) -> anyhow::Resul
                                 }
                             }
                             BotMessage::Tick => {
+                                let mut tps_total = 0.0;
+                                let mut tps_count = 0;
+
                                 for player in players.values_mut() {
                                     let res = player.tick(args, &mut ctx_write);
+
+                                    if player.last_game_time.1 > last_tick && !player.tps.is_nan() {
+                                        tps_total += player.tps;
+                                        tps_count += 1;
+                                    }
 
                                     if let Err(error) = res {
                                         handle_error(player, error, &worker);
                                     }
                                 }
+
+                                if tps_count != 0 {
+                                    worker
+                                        .console_bound
+                                        .0
+                                        .send(ConsoleMessage::TPS(tps_total, tps_count))
+                                        .context("Send msg")?;
+                                }
+
+                                last_tick = Instant::now();
                             }
                             BotMessage::Stop => {
                                 break 'main_loop;
@@ -208,6 +229,7 @@ fn connect_bot(
         .expect("Send msg");
 
     player.connected = true;
+    player.join_time = Some(Instant::now());
 
     Ok(())
 }

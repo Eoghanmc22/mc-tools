@@ -28,8 +28,8 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub static STOP_THE_WORLD: AtomicBool = AtomicBool::new(false);
 
 // motd, implement cached reading (hash first few bytes and lookup in some kind
-// of hash map), implement tps monetering, make ui more colerful, use write/read vectored,
-// steal graphs from bottom, batch pachet sending, Write docs, Write readme, male log widget update
+// of hash map), make ui more colerful, use write/read vectored,
+// steal graphs from bottom, batch pachet sending, Write docs, Write readme, make log widget update
 // faster
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();

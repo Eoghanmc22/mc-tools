@@ -86,7 +86,8 @@ pub mod play {
             DisconnectPacket<'a> = 0x19,
             KeepAlivePacket = 0x20,
             JoinGamePacket<'a> = 0x25,
-            TeleportPacket = 0x39
+            TeleportPacket = 0x39,
+            TimePacket = 0x5C
         }
     }
 
@@ -122,6 +123,13 @@ pub mod play {
 
             pub id: u32 as VarInt,
             pub dismount: bool
+        }
+    }
+
+    define_data! {
+        pub struct TimePacket {
+            pub world_age: u64,
+            pub time_of_day: i64
         }
     }
 }

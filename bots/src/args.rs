@@ -11,10 +11,10 @@ pub struct Args {
     #[clap(
         short,
         long,
-        default_value = "160",
+        default_value = "NAN",
         help = "The radius (square) the bots will stay within"
     )]
-    pub radius: usize,
+    pub radius: f64,
     #[clap(
         short = 'p',
         long,

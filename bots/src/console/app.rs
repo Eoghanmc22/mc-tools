@@ -68,6 +68,8 @@ impl<'a> App<'a> {
         let mut packets_tx_next = 0;
         let mut packets_rx_next = 0;
 
+        let mut tps_data = None;
+
         for worker in self.workers {
             for message in worker.console_bound.1.try_iter() {
                 match message {
@@ -76,6 +78,15 @@ impl<'a> App<'a> {
                     }
                     ConsoleMessage::BotDisconnected => {
                         self.bots -= 1;
+                    }
+                    ConsoleMessage::TPS(total, count) => {
+                        let (last_total, last_count) = if let Some((total, count)) = tps_data {
+                            (total, count)
+                        } else {
+                            (0.0, 0)
+                        };
+
+                        tps_data = Some((total + last_total, count + last_count));
                     }
                 }
             }
@@ -95,6 +106,11 @@ impl<'a> App<'a> {
             .push((self.tick as f64, bandwidth_rx));
         self.bandwidth_out_data
             .push((self.tick as f64, bandwidth_tx));
+        if let Some((total, count)) = tps_data {
+            if count > self.bots / 3 {
+                self.tps.push((total * 100.0 / count as f64) as u64);
+            }
+        }
 
         let lower = self.bot_count_data.len().max(100) - 100;
         self.bot_count_data.drain(0..lower);
@@ -106,8 +122,6 @@ impl<'a> App<'a> {
 
         self.packets_tx = packets_tx_next;
         self.packets_rx = packets_rx_next;
-
-        // TODO tps
 
         self.tick += 1;
     }

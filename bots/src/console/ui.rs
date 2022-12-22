@@ -57,7 +57,10 @@ fn draw_stats<B: Backend>(f: &mut Frame<B>, app: &mut App, area: Rect) {
     f.render_widget(status, chunks[0]);
 
     let tps = Sparkline::default()
-        .block(Block::default().title("TPS:"))
+        .block(Block::default().title(format!(
+            "TPS: {:.2}",
+            app.tps.last().copied().unwrap_or(0) as f64 / 100.0
+        )))
         .data(&app.tps);
     f.render_widget(tps, chunks[1]);
 }

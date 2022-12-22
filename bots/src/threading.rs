@@ -6,6 +6,7 @@ use mio::Waker;
 pub enum ConsoleMessage {
     BotConnected,
     BotDisconnected,
+    TPS(f64, u64),
 }
 
 pub enum BotMessage {
