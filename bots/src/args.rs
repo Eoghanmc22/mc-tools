@@ -11,13 +11,6 @@ pub struct Args {
     #[clap(
         short,
         long,
-        default_value = "5",
-        help = "The time in ms to wait between connecting each bot"
-    )]
-    pub delay: usize,
-    #[clap(
-        short,
-        long,
         default_value = "160",
         help = "The radius (square) the bots will stay within"
     )]
@@ -29,12 +22,7 @@ pub struct Args {
         help = "The number of threads to create"
     )]
     pub threads: usize,
-    #[clap(
-        short,
-        long,
-        default_value = "500",
-        help = "Time in ms between ui updates"
-    )]
+    #[clap(long, default_value = "500", help = "Time in ms between ui updates")]
     pub ui_update_rate: u64,
     #[clap(
         short,
