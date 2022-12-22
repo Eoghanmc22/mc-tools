@@ -50,7 +50,7 @@ pub fn start(ctx: BotContext, args: &Args, worker: Worker) -> anyhow::Result<()>
 
     let mut players = HashMap::new();
 
-    loop {
+    'main_loop: loop {
         poll.poll(&mut events, None).context("Poll")?;
 
         for event in &events {
@@ -73,6 +73,9 @@ pub fn start(ctx: BotContext, args: &Args, worker: Worker) -> anyhow::Result<()>
                                         handle_error(player, error, &worker);
                                     }
                                 }
+                            }
+                            BotMessage::Stop => {
+                                break 'main_loop;
                             }
                         }
                     }
@@ -126,6 +129,8 @@ pub fn start(ctx: BotContext, args: &Args, worker: Worker) -> anyhow::Result<()>
 
         players.retain(|_, player| !player.kicked);
     }
+
+    Ok(())
 }
 
 fn create_bot<'a>(

@@ -11,6 +11,7 @@ pub enum ConsoleMessage {
 pub enum BotMessage {
     ConnectBot(String),
     Tick,
+    Stop,
 }
 
 #[derive(Debug, Clone)]

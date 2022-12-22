@@ -3,6 +3,7 @@ mod ui;
 
 use std::{
     io,
+    sync::atomic::Ordering,
     time::{Duration, Instant},
 };
 
@@ -16,7 +17,7 @@ use tui::{
     Terminal,
 };
 
-use crate::{threading::Worker, Args};
+use crate::{threading::Worker, Args, STOP_THE_WORLD};
 
 use self::app::App;
 
@@ -56,6 +57,10 @@ fn run_app<B: Backend>(
     let tick_rate = Duration::from_millis(args.ui_update_rate);
 
     loop {
+        if STOP_THE_WORLD.load(Ordering::SeqCst) {
+            break;
+        }
+
         terminal.draw(|f| ui::draw(f, &mut app))?;
 
         let timeout = tick_rate
@@ -76,7 +81,9 @@ fn run_app<B: Backend>(
         }
 
         if app.should_quit {
-            return Ok(());
+            break;
         }
     }
+
+    Ok(())
 }

@@ -17,8 +17,7 @@ proto = { path = "../proto" }
 tui = "0.19"
 crossterm = "0.25"
 clap = { version = "3.2", features = ["derive"] }
-
-# Config
+ctrlc = { version = "3.0", features = ["termination"] }
 
 # Threading
 crossbeam = "0.8"

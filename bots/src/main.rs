@@ -7,7 +7,10 @@ use clap::Parser;
 use crossbeam::channel::unbounded;
 use log::{info, LevelFilter};
 use std::{
-    sync::{atomic::AtomicU64, Arc},
+    sync::{
+        atomic::{AtomicBool, AtomicU64, Ordering},
+        Arc,
+    },
     thread,
     time::{Duration, Instant},
 };
@@ -26,7 +29,9 @@ const TICK_DURATION: Duration = Duration::from_millis(50);
 
 const CONEOLE_UI: bool = true;
 
-// A way to stop everything, motd, implement cached reading (hash first few bytes and lookup in some kind
+pub static STOP_THE_WORLD: AtomicBool = AtomicBool::new(false);
+
+// motd, implement cached reading (hash first few bytes and lookup in some kind
 // of hash map), implement tps monetering, make ui more colerful, use write/read vectored, ipv6
 // support, steal graphs from bottom, batch pachet sending, optimize
 fn main() -> anyhow::Result<()> {
@@ -35,6 +40,9 @@ fn main() -> anyhow::Result<()> {
     } else {
         env_logger::builder().filter_level(LevelFilter::Info).init();
     }
+
+    ctrlc::set_handler(|| STOP_THE_WORLD.store(true, Ordering::SeqCst))
+        .context("Set ctrl-c handler")?;
 
     info!("Starting {} - {}", NAME, VERSION);
 
@@ -90,6 +98,10 @@ fn main() -> anyhow::Result<()> {
         // Bot spawner
         s.spawn(|| {
             for i in 0..args.count {
+                if STOP_THE_WORLD.load(Ordering::SeqCst) {
+                    break;
+                }
+
                 let worker = i % workers.len();
                 let worker = &workers[worker];
 
@@ -110,6 +122,15 @@ fn main() -> anyhow::Result<()> {
         s.spawn(|| {
             let mut tick = Instant::now();
             loop {
+                if STOP_THE_WORLD.load(Ordering::SeqCst) {
+                    for worker in &workers {
+                        worker.bot_bound.0.send(BotMessage::Stop).expect("Send msg");
+                        worker.waker.as_ref().unwrap().wake().unwrap();
+                    }
+
+                    break;
+                }
+
                 for worker in &workers {
                     worker.bot_bound.0.send(BotMessage::Tick).expect("Send msg");
                     worker.waker.as_ref().unwrap().wake().unwrap();
@@ -121,6 +142,8 @@ fn main() -> anyhow::Result<()> {
             }
         });
     });
+
+    println!("Exiting!");
 
     Ok(())
 }
