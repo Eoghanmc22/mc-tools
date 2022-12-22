@@ -84,7 +84,13 @@ pub fn start(ctx: BotContext, args: &Args, worker: Worker) -> anyhow::Result<()>
                     if let Some(player) = players.get_mut(&bot_token) {
                         // Set up the player if needed
                         if event.is_writable() && !player.connected && !player.kicked {
-                            let res = connect_bot(player, args.server.0, &mut ctx_write, &worker);
+                            let res = connect_bot(
+                                player,
+                                args.server.0,
+                                &mut ctx_write,
+                                &worker,
+                                args.proto_id.unwrap_or(PROTOCOL_VERSION),
+                            );
 
                             if let Err(error) = res {
                                 handle_error(player, error, &worker);
@@ -166,6 +172,7 @@ fn connect_bot(
     server: SocketAddr,
     ctx: &mut GlobalWriteContext,
     worker: &Worker,
+    protocol_version: u32,
 ) -> Result<(), CommunicationError> {
     match player.socket.0.peer_addr() {
         Err(err) if err.kind() == ErrorKind::NotConnected => return Ok(()),
@@ -176,7 +183,7 @@ fn connect_bot(
     player.socket.0.set_nodelay(true)?;
 
     let handshake = HandshakePacket {
-        protocol_version: PROTOCOL_VERSION,
+        protocol_version,
         server_address: &server.ip().to_string(),
         server_port: server.port(),
         next_state: LoginProtoC2S::PROTOCOL_ID,

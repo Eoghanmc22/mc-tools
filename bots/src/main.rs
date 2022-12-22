@@ -25,17 +25,16 @@ mod threading;
 const NAME: &str = env!("CARGO_PKG_NAME");
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-const TICK_DURATION: Duration = Duration::from_millis(50);
-
-const CONEOLE_UI: bool = true;
-
 pub static STOP_THE_WORLD: AtomicBool = AtomicBool::new(false);
 
 // motd, implement cached reading (hash first few bytes and lookup in some kind
-// of hash map), implement tps monetering, make ui more colerful, use write/read vectored, ipv6
-// support, steal graphs from bottom, batch pachet sending, optimize
+// of hash map), implement tps monetering, make ui more colerful, use write/read vectored,
+// steal graphs from bottom, batch pachet sending, Write docs, Write readme, male log widget update
+// faster
 fn main() -> anyhow::Result<()> {
-    if CONEOLE_UI {
+    let args = Args::parse();
+
+    if args.ui {
         tui_logger::init_logger(LevelFilter::Info).unwrap();
     } else {
         env_logger::builder().filter_level(LevelFilter::Info).init();
@@ -45,8 +44,6 @@ fn main() -> anyhow::Result<()> {
         .context("Set ctrl-c handler")?;
 
     info!("Starting {} - {}", NAME, VERSION);
-
-    let args = Args::parse();
 
     let threads = if args.threads == 0 {
         thread::available_parallelism()
@@ -89,7 +86,7 @@ fn main() -> anyhow::Result<()> {
         }
 
         // Console ui
-        if CONEOLE_UI {
+        if args.ui {
             s.spawn(|| {
                 console::start(&args, &workers).expect("Run console");
             });
@@ -114,13 +111,15 @@ fn main() -> anyhow::Result<()> {
 
                 worker.waker.as_ref().unwrap().wake().unwrap();
 
-                thread::sleep(Duration::from_millis(args.bot_join_rate));
+                thread::sleep(Duration::from_millis(args.join_rate));
             }
         });
 
         // Tick schedualer
         s.spawn(|| {
             let mut tick = Instant::now();
+            let tick_duration = Duration::from_millis(args.tick_rate);
+
             loop {
                 if STOP_THE_WORLD.load(Ordering::SeqCst) {
                     for worker in &workers {
@@ -136,7 +135,7 @@ fn main() -> anyhow::Result<()> {
                     worker.waker.as_ref().unwrap().wake().unwrap();
                 }
 
-                tick += TICK_DURATION;
+                tick += tick_duration;
                 let delay = tick - Instant::now();
                 thread::sleep(delay);
             }

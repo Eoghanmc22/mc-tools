@@ -81,6 +81,7 @@ fn run_app<B: Backend>(
         }
 
         if app.should_quit {
+            STOP_THE_WORLD.store(true, Ordering::SeqCst);
             break;
         }
     }
