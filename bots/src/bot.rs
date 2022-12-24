@@ -263,11 +263,14 @@ fn handle_error<S>(player: &mut Player<S>, error: CommunicationError, worker: &W
     player.kicked = true;
 
     warn!("Bot encountered error {}: {}", player.username, error);
-    worker
-        .console_bound
-        .0
-        .send(ConsoleMessage::BotDisconnected)
-        .expect("Send msg");
+
+    if player.connected {
+        worker
+            .console_bound
+            .0
+            .send(ConsoleMessage::BotDisconnected)
+            .expect("Send msg");
+    }
 }
 
 struct LoggedStream(pub TcpStream, pub Arc<Worker>);
