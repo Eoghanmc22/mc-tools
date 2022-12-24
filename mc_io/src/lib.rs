@@ -100,14 +100,42 @@ where
         }
     }
 
+    pub fn write_packets<F>(
+        &mut self,
+        ctx: &mut GlobalWriteContext,
+        compression_threshold: i32,
+        packets: F,
+    ) -> Result<(), CommunicationError>
+    where
+        F: FnOnce(&mut PacketWriter) -> Result<(), CommunicationError>,
+    {
+        let (write_buf, compression_ctx) = ctx.compression();
+
+        {
+            let mut writer = PacketWriter {
+                write_buf,
+                compression_ctx,
+                compression_threshold,
+            };
+            (packets)(&mut writer)?;
+        }
+
+        self.write_buffer(write_buf)
+    }
+
     pub fn write_packet<'a, P: Packet<'a>>(
         &mut self,
         packet: &'a P,
         ctx: &mut GlobalWriteContext,
         compression_threshold: i32,
     ) -> Result<(), CommunicationError> {
-        let (write_buf, compression_ctx) = ctx.compression();
-        packet::helpers::write_packet(packet, write_buf, compression_ctx, compression_threshold)?;
+        let (write_buf, mut compression_ctx) = ctx.compression();
+        packet::helpers::write_packet(
+            packet,
+            write_buf,
+            &mut compression_ctx,
+            compression_threshold,
+        )?;
         self.write_buffer(write_buf)
     }
 
@@ -267,5 +295,26 @@ impl Debug for CompressionWriteContext<'_, '_> {
         f.debug_struct("CompressionWriteContext")
             .field("compression_buf", &self.compression_buf)
             .finish_non_exhaustive()
+    }
+}
+
+pub struct PacketWriter<'a, 'b, 'c> {
+    write_buf: &'a mut Buffer,
+    compression_ctx: CompressionWriteContext<'b, 'c>,
+    compression_threshold: i32,
+}
+impl PacketWriter<'_, '_, '_> {
+    pub fn write_packet<'a, P: Packet<'a>>(
+        &mut self,
+        packet: &'a P,
+    ) -> Result<(), CommunicationError> {
+        packet::helpers::write_packet(
+            packet,
+            self.write_buf,
+            &mut self.compression_ctx,
+            self.compression_threshold,
+        )?;
+
+        Ok(())
     }
 }

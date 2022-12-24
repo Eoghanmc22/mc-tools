@@ -216,10 +216,12 @@ fn connect_bot(
 
     player
         .ctx_write
-        .write_packet(&handshake, ctx, player.compression_threshold)?;
-    player
-        .ctx_write
-        .write_packet(&login_start, ctx, player.compression_threshold)?;
+        .write_packets(ctx, player.compression_threshold, |writer| {
+            writer.write_packet(&handshake)?;
+            writer.write_packet(&login_start)?;
+
+            Ok(())
+        })?;
 
     info!("Bot Connected: {}", player.username);
     worker

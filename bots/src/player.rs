@@ -91,29 +91,33 @@ where
         if !self.should_tick || self.kicked {
             return Ok(());
         }
-
-        self.position += self.velocity;
-
-        if self.position.x.abs() > args.radius as f64 {
-            self.velocity.x = -self.velocity.x;
-        }
-        if self.position.z.abs() > args.radius as f64 {
-            self.velocity.z = -self.velocity.z;
-        }
-
-        // TODO: Send a variety of move packets
-        let move_packet = PositionRotationPacket {
-            x: self.position.x,
-            y: self.position.y,
-            z: self.position.z,
-            on_ground: false,
-            yaw: 0.0,
-            pitch: 0.0,
-        };
         self.ctx_write
-            .write_packet(&move_packet, ctx, self.compression_threshold)?;
+            .write_packets(ctx, self.compression_threshold, |writer| {
+                self.position += self.velocity;
 
-        // TODO: Implement random actions
+                if self.position.x.abs() > args.radius as f64 {
+                    self.velocity.x = -self.velocity.x;
+                }
+                if self.position.z.abs() > args.radius as f64 {
+                    self.velocity.z = -self.velocity.z;
+                }
+
+                // TODO: Send a variety of move packets
+                let move_packet = PositionRotationPacket {
+                    x: self.position.x,
+                    y: self.position.y,
+                    z: self.position.z,
+                    on_ground: false,
+                    yaw: 0.0,
+                    pitch: 0.0,
+                };
+
+                writer.write_packet(&move_packet)?;
+
+                // TODO: Implement random actions
+
+                Ok(())
+            })?;
 
         Ok(())
     }

@@ -72,7 +72,7 @@ fn create_packet_meta<'a>(
 pub fn write_packet<'a, 'b, P>(
     packet: &'a P,
     packet_buf: &mut Buffer,
-    ctx: CompressionWriteContext,
+    ctx: &mut CompressionWriteContext,
     compression_threshold: i32,
 ) -> Result<(), WriteError>
 where
