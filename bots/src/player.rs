@@ -5,7 +5,7 @@ use std::{
     time::{Duration, Instant, SystemTime},
 };
 
-use euclid::default::*;
+use euclid::{default::*, Angle};
 use mc_io::{
     error::{CommunicationError, ReadError},
     ConnectionReadContext, ConnectionWriteContext, PacketHandler, RawPacket,
@@ -46,6 +46,7 @@ pub struct Player<S> {
 
     pub position: Point3D<f64>,
     pub velocity: Vector3D<f64>,
+    pub angle_bias: Rotation3D<f64>,
 
     pub last_game_time: (u64, Instant),
     pub tps: f64,
@@ -80,6 +81,7 @@ where
             velocity: Vector3D::new(velocity.0, 0.0, velocity.1)
                 .normalize()
                 .mul(0.2),
+            angle_bias: Rotation3D::around_y(Angle::degrees(rand::random::<f64>() * 20.0 - 10.0)),
             state: LoginProtoS2C::PROTOCOL_ID,
             uuid: 0,
             compression_threshold: -1,
@@ -100,24 +102,32 @@ where
             .as_mut()
             .ok_or("Connection writer theft")?
             .write_packets(&mut ctx.g_write_ctx, self.compression_threshold, |writer| {
-                self.position += self.velocity;
-
-                if self.position.x.abs() > args.radius as f64 {
-                    self.velocity.x = -self.velocity.x;
-                }
-                if self.position.z.abs() > args.radius as f64 {
-                    self.velocity.z = -self.velocity.z;
-                }
-
                 if !args.no_move {
+                    self.velocity = self.angle_bias.transform_vector3d(self.velocity);
+                    self.position += self.velocity;
+
+                    if self.position.x.abs() > args.radius as f64 {
+                        self.velocity.x = -self.velocity.x;
+                    }
+                    if self.position.z.abs() > args.radius as f64 {
+                        self.velocity.z = -self.velocity.z;
+                    }
+
+                    let yaw = self
+                        .velocity
+                        .xz()
+                        .angle_to(Vector2D::new(0.0, 1.0))
+                        .to_f32()
+                        .to_degrees();
+
                     // TODO: Send a variety of move packets
                     let move_packet = PositionRotationPacket {
                         x: self.position.x,
                         y: self.position.y,
                         z: self.position.z,
-                        on_ground: false,
-                        yaw: 0.0,
+                        yaw,
                         pitch: 0.0,
+                        on_ground: false,
                     };
 
                     writer.write_packet(&move_packet)?;

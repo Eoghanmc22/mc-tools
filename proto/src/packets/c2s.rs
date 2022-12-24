@@ -119,11 +119,30 @@ pub mod play {
     }
 
     define_data! {
+        pub struct PositionPacket {
+            pub x: f64,
+            pub y: f64,
+            pub z: f64,
+
+            pub on_ground: bool
+        }
+    }
+
+    define_data! {
         pub struct PositionRotationPacket {
             pub x: f64,
             pub y: f64,
             pub z: f64,
 
+            pub yaw: f32,
+            pub pitch: f32,
+
+            pub on_ground: bool
+        }
+    }
+
+    define_data! {
+        pub struct RotationPacket {
             pub yaw: f32,
             pub pitch: f32,
 
