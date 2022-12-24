@@ -60,16 +60,16 @@ macro_rules! define_proto {
         }
 
         paste::paste! {
-            pub trait [< PacketHandler $proto_name >] {
+            pub trait [< PacketHandler $proto_name >]<C> {
                 type Error: std::error::Error + From<$crate::DecodingError>;
 
                 $(
-                    fn [<handle_ $packet:snake>](&mut self, _: $packet) -> Result<(), Self::Error> {
+                    fn [<handle_ $packet:snake>](&mut self, _: $packet, _: &mut C) -> Result<(), Self::Error> {
                         Ok(())
                     }
                 )*
 
-                fn [< parse_and_handle_ $proto_name:snake >] <'a, I: Into<&'a [u8]>> (&mut self, packet: I) -> Result<(), Self::Error> {
+                fn [< parse_and_handle_ $proto_name:snake >] <'a, I: Into<&'a [u8]>> (&mut self, packet: I, ctx: &mut C) -> Result<(), Self::Error> {
                     let mut bytes = packet.into();
 
                     let packet_id: u8 = $crate::Data::try_decode(&mut bytes)?;
@@ -82,7 +82,7 @@ macro_rules! define_proto {
                                     return Err($crate::DecodingError::DirtyBuffer(format!("{:?}", packet_id)).into())?
                                 }
 
-                                Ok(self.[<handle_ $packet:snake>](packet)?)
+                                Ok(self.[<handle_ $packet:snake>](packet, ctx)?)
                             }
                         )*
                         _ => {

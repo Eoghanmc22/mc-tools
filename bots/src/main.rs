@@ -19,6 +19,7 @@ mod address;
 mod args;
 mod bot;
 mod console;
+pub mod context;
 mod player;
 mod threading;
 
@@ -34,7 +35,7 @@ pub static STOP_THE_WORLD: AtomicBool = AtomicBool::new(false);
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
-    if args.ui {
+    if !args.no_ui {
         tui_logger::init_logger(LevelFilter::Info).unwrap();
     } else {
         env_logger::builder().filter_level(LevelFilter::Info).init();
@@ -88,7 +89,7 @@ fn main() -> anyhow::Result<()> {
         }
 
         // Console ui
-        if args.ui {
+        if !args.no_ui {
             s.spawn(|| {
                 console::start(&args, &workers).expect("Run console");
             });

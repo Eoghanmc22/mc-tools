@@ -17,6 +17,8 @@ pub enum CommunicationError {
     Write(#[from] WriteError),
     #[error("Read error: {0}")]
     Read(#[from] ReadError),
+    #[error("Internal error: {0}")]
+    InternalError(String),
 }
 
 #[derive(Error, Debug)]
@@ -46,5 +48,11 @@ pub enum ReadError {
 impl From<DecodingError> for CommunicationError {
     fn from(value: DecodingError) -> Self {
         CommunicationError::Read(value.into())
+    }
+}
+
+impl From<&str> for CommunicationError {
+    fn from(value: &str) -> Self {
+        CommunicationError::InternalError(value.to_owned())
     }
 }

@@ -1,8 +1,9 @@
+use crate::context::Context as WorkerContext;
 use crate::player::Player;
 use crate::threading::{ConsoleMessage, Worker};
 use crate::{threading::BotMessage, Args};
 use anyhow::Context;
-use log::{error, info, warn};
+use log::{info, warn};
 use mc_io::error::CommunicationError;
 use mc_io::{GlobalReadContext, GlobalWriteContext};
 use mio::net::TcpStream;
@@ -11,8 +12,8 @@ use proto::packets::c2s::handshake::HandshakePacket;
 use proto::packets::c2s::login::{LoginProtoC2S, LoginStartPacket};
 
 use std::collections::HashMap;
+use std::fs;
 use std::io::{ErrorKind, Read, Write};
-use std::mem;
 use std::net::SocketAddr;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -45,11 +46,17 @@ pub fn start(ctx: BotContext, args: &Args, worker: Arc<Worker>) -> anyhow::Resul
     let mut events = Events::with_capacity(500);
 
     let mut ctx_read = GlobalReadContext::new();
-    let mut ctx_write = GlobalWriteContext::new();
 
     let mut players = HashMap::new();
 
     let mut last_tick = Instant::now();
+
+    let ctx_write = GlobalWriteContext::new();
+    let messages = generate_messages(args).context("Could not generate chat messages")?;
+    let mut context = WorkerContext {
+        messages,
+        g_write_ctx: ctx_write,
+    };
 
     'main_loop: loop {
         poll.poll(&mut events, None).context("Poll")?;
@@ -71,7 +78,7 @@ pub fn start(ctx: BotContext, args: &Args, worker: Arc<Worker>) -> anyhow::Resul
                                 let mut tps_count = 0;
 
                                 for player in players.values_mut() {
-                                    let res = player.tick(args, &mut ctx_write);
+                                    let res = player.tick(args, &mut context);
 
                                     if player.last_game_time.1 > last_tick && !player.tps.is_nan() {
                                         tps_total += player.tps;
@@ -106,7 +113,7 @@ pub fn start(ctx: BotContext, args: &Args, worker: Arc<Worker>) -> anyhow::Resul
                             let res = connect_bot(
                                 player,
                                 args.server.0,
-                                &mut ctx_write,
+                                &mut context,
                                 &worker,
                                 args.proto_id.unwrap_or(PROTOCOL_VERSION),
                             );
@@ -117,8 +124,12 @@ pub fn start(ctx: BotContext, args: &Args, worker: Arc<Worker>) -> anyhow::Resul
                         }
 
                         // handle write
-                        if event.is_writable() && player.connected && !player.kicked {
-                            let res = player.ctx_write.write_unwritten();
+                        if event.is_writable() && !player.kicked {
+                            let res = player
+                                .ctx_write
+                                .as_mut()
+                                .context("Connection writer theft")?
+                                .write_unwritten();
 
                             if let Err(error) = res {
                                 handle_error(player, error, &worker);
@@ -126,25 +137,18 @@ pub fn start(ctx: BotContext, args: &Args, worker: Arc<Worker>) -> anyhow::Resul
                         }
 
                         // handle read
-                        if event.is_readable() && player.connected && !player.kicked {
+                        if event.is_readable() && !player.kicked {
                             let player_read = player.ctx_read.take();
 
                             if let Some(mut player_read) = player_read {
-                                player.g_ctx_write = Some(mem::take(&mut ctx_write));
-
-                                let res = player_read.read_packets(&mut ctx_read, player);
+                                let res =
+                                    player_read.read_packets(&mut ctx_read, player, &mut context);
 
                                 if let Err(error) = res {
                                     handle_error(player, error, &worker);
                                 }
 
                                 player.ctx_read = Some(player_read);
-
-                                if let Some(g_ctx_write) = player.g_ctx_write.take() {
-                                    ctx_write = g_ctx_write;
-                                } else {
-                                    error!("A packet reader stole the globle write context");
-                                }
                             }
                         }
                     }
@@ -156,6 +160,19 @@ pub fn start(ctx: BotContext, args: &Args, worker: Arc<Worker>) -> anyhow::Resul
     }
 
     Ok(())
+}
+
+fn generate_messages(args: &Args) -> anyhow::Result<Vec<String>> {
+    if let Some(name) = &args.message_file {
+        let file = fs::read_to_string(name).context("Could not read `message_file`")?;
+        Ok(file.lines().map(|it| it.to_owned()).collect())
+    } else {
+        Ok(vec![
+            "This is a chat message!".to_owned(),
+            "Wow".to_owned(),
+            "Idk what to put here".to_owned(),
+        ])
+    }
 }
 
 fn create_bot(
@@ -189,7 +206,7 @@ fn create_bot(
 fn connect_bot(
     player: &mut Player<Backend>,
     server: SocketAddr,
-    ctx: &mut GlobalWriteContext,
+    ctx: &mut WorkerContext,
     worker: &Worker,
     protocol_version: u32,
 ) -> Result<(), CommunicationError> {
@@ -216,12 +233,18 @@ fn connect_bot(
 
     player
         .ctx_write
-        .write_packets(ctx, player.compression_threshold, |writer| {
-            writer.write_packet(&handshake)?;
-            writer.write_packet(&login_start)?;
+        .as_mut()
+        .ok_or("Connection writer theft")?
+        .write_packets(
+            &mut ctx.g_write_ctx,
+            player.compression_threshold,
+            |writer| {
+                writer.write_packet(&handshake)?;
+                writer.write_packet(&login_start)?;
 
-            Ok(())
-        })?;
+                Ok(())
+            },
+        )?;
 
     info!("Bot Connected: {}", player.username);
     worker

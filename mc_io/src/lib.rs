@@ -50,13 +50,14 @@ where
         }
     }
 
-    pub fn read_packets<H: PacketHandler>(
+    pub fn read_packets<C, H: PacketHandler<C>>(
         &mut self,
-        ctx: &mut GlobalReadContext,
+        read_ctx: &mut GlobalReadContext,
         handler: &mut H,
+        ctx: &mut C,
     ) -> Result<(), CommunicationError> {
-        let handler = handle::create_handler(handler);
-        self.read(ctx, handler)
+        let handler = handle::create_handler(handler, ctx);
+        self.read(read_ctx, handler)
     }
 
     pub fn read<F>(
