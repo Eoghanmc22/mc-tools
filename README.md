@@ -24,8 +24,7 @@ cargo build --release --bin bots
 # Binary will be located at ./target/release/bots
 
 # Alternativly, use cargo install
-cd bots
-cargo install --path .
+cargo install --path ./bots
 # Binary avaible as `bots` command
 
 # Simple usage
