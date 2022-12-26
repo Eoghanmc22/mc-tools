@@ -7,8 +7,8 @@ A collection of useful tools related to minecraft networking written in rust
 - `proto`: Minecraft packet definetions for 1.19.2
 
 # `bots`
-*DISCLAIMER*: Usage of this stress testing tool for purposes than testing
-your own infrastructure can be seen as *illeagal* in many countries
+**DISCLAIMER**: Usage of this stress testing tool for purposes than testing
+your own infrastructure can be seen as **illeagal** in many countries
 
 A tool to stress test minecraft server by connecting artificial players
 
