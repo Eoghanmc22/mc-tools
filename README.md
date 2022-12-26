@@ -17,12 +17,14 @@ A tool to stress test minecraft server by connecting artificial players
 ```sh
 # Clone repo
 git clone https://github.com/Eoghanmc22/mc-tools.git
+cd mc-tools
 
 # Compile
 cargo build --release --bin bots
 # Binary will be located at ./target/release/bots
 
 # Alternativly, use cargo install
+cd bots
 cargo install --path .
 # Binary avaible as `bots` command
 
