@@ -68,7 +68,7 @@ where
 {
     pub fn new(stream: S, username: String) -> Self {
         let stream = Arc::new(stream);
-        let velocity = (rand::random(), rand::random());
+        let velocity = (rand::random::<f64>() - 0.5, rand::random::<f64>() - 0.5);
 
         Self {
             socket: stream.clone(),
@@ -84,7 +84,7 @@ where
             velocity: Vector3D::new(velocity.0, 0.0, velocity.1)
                 .normalize()
                 .mul(0.2),
-            angle_bias: Rotation3D::around_y(Angle::degrees(rand::random::<f64>() * 20.0 - 10.0)),
+            angle_bias: Rotation3D::around_y(Angle::degrees(rand::random::<f64>() * 10.0 - 5.0)),
             state: LoginProtoS2C::PROTOCOL_ID,
             uuid: 0,
             compression_threshold: -1,
@@ -114,7 +114,8 @@ where
                             // No change to velocity
                         }
                         Movement::Random => {
-                            let velocity = (rand::random(), rand::random());
+                            let velocity =
+                                (rand::random::<f64>() - 0.5, rand::random::<f64>() - 0.5);
                             self.velocity = Vector3D::new(velocity.0, 0.0, velocity.1)
                                 .normalize()
                                 .mul(0.2);
@@ -133,6 +134,7 @@ where
                         let yaw = self
                             .velocity
                             .xz()
+                            .reflect(Vector2D::new(1.0, 0.0))
                             .angle_to(Vector2D::new(0.0, 1.0))
                             .to_f32()
                             .to_degrees();
