@@ -16,7 +16,7 @@ proto = { path = "../proto" }
 # UX
 tui = "0.19"
 crossterm = "0.25"
-clap = { version = "3.2", features = ["derive"] }
+clap = { version = "4.0", features = ["derive"] }
 ctrlc = { version = "3.0", features = ["termination"] }
 
 # Threading
@@ -30,5 +30,5 @@ env_logger = "0.10"
 # Misc
 rand = "0.8"
 number_prefix = "0.4"
-euclid = "0.22.7"
+euclid = "0.22"
 anyhow = "1"

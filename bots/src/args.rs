@@ -1,49 +1,66 @@
 use crate::address::MinecraftAddress;
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 
 #[derive(Parser, Clone, Debug)]
-#[clap(author, version, about, long_about = None)]
+#[command(author, version, about, long_about = None)]
 pub struct Args {
-    #[clap(help = "The ip address of the server to connect to")]
+    #[arg(help = "The ip address of the server to connect to")]
     pub server: MinecraftAddress,
-    #[clap(help = "The amount of bots to spawn")]
+    #[arg(help = "The amount of bots to spawn")]
     pub count: usize,
-    #[clap(
+    #[arg(
         short,
         long,
-        default_value = "NAN",
+        default_value_t = f64::NAN,
         help = "The radius (square) the bots will stay within"
     )]
     pub radius: f64,
-    #[clap(
+    #[arg(
         short = 'p',
         long,
-        default_value = "0",
+        default_value_t = 0,
         help = "The number of threads to create"
     )]
     pub threads: usize,
-    #[clap(long, default_value = "500", help = "Time in ms between ui updates")]
+    #[arg(long, default_value_t = 500, help = "Time in ms between ui updates")]
     pub ui_update_rate: u64,
-    #[clap(
+    #[arg(
         short,
         long,
-        default_value = "15",
+        default_value_t = 15,
         help = "Time in ms between bot connections"
     )]
     pub join_rate: u64,
-    #[clap(long, default_value = "50", help = "Time in ms between ticks")]
+    #[arg(long, default_value_t = 50, help = "Time in ms between ticks")]
     pub tick_rate: u64,
-    #[clap(long, help = "Disables bot actions")]
+    #[arg(long, help = "Disables bot actions")]
     pub no_action: bool,
-    #[clap(long, help = "Disables bot movement")]
+    #[arg(long, help = "Disables bot movement")]
     pub no_move: bool,
-    #[clap(long, help = "Disables terminal ui")]
+    #[arg(long, help = "Disables terminal ui")]
     pub no_ui: bool,
-    #[clap(long, help = "The protocol id presented to the server")]
+    #[arg(long, help = "Disables sending yaw and pitch angles")]
+    pub no_yaw: bool,
+    #[arg(long, help = "The protocol id presented to the server")]
     pub proto_id: Option<u32>,
-    #[clap(
+    #[arg(
         long,
         help = "The file to take chat messages from. Messages are seperated by new lines"
     )]
     pub message_file: Option<String>,
+    #[arg(long, value_enum, default_value_t = Movement::Biased, help = "The method used to calculate movement updates")]
+    pub movement: Movement,
+    #[arg(
+        long,
+        default_value_t = 0.25,
+        help = "The chance of sending an action packet"
+    )]
+    pub action_chance: f64,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
+pub enum Movement {
+    Biased,
+    Consistant,
+    Random,
 }

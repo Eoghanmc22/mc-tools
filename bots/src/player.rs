@@ -15,7 +15,7 @@ use proto::packets::{
         self,
         play::{
             AnimationPacket, ChatMesssagePacket, HeldSlotPacket, PlayerActionPacket,
-            PositionRotationPacket,
+            PositionPacket, PositionRotationPacket,
         },
     },
     s2c::{
@@ -25,7 +25,10 @@ use proto::packets::{
 };
 use rand::{distributions::Standard, prelude::Distribution, seq::SliceRandom, Rng};
 
-use crate::{args::Args, context::Context};
+use crate::{
+    args::{Args, Movement},
+    context::Context,
+};
 
 pub struct Player<S> {
     pub socket: Arc<S>,
@@ -103,7 +106,20 @@ where
             .ok_or("Connection writer theft")?
             .write_packets(&mut ctx.g_write_ctx, self.compression_threshold, |writer| {
                 if !args.no_move {
-                    self.velocity = self.angle_bias.transform_vector3d(self.velocity);
+                    match args.movement {
+                        Movement::Biased => {
+                            self.velocity = self.angle_bias.transform_vector3d(self.velocity);
+                        }
+                        Movement::Consistant => {
+                            // No change to velocity
+                        }
+                        Movement::Random => {
+                            let velocity = (rand::random(), rand::random());
+                            self.velocity = Vector3D::new(velocity.0, 0.0, velocity.1)
+                                .normalize()
+                                .mul(0.2);
+                        }
+                    }
                     self.position += self.velocity;
 
                     if self.position.x.abs() > args.radius as f64 {
@@ -113,27 +129,37 @@ where
                         self.velocity.z = -self.velocity.z;
                     }
 
-                    let yaw = self
-                        .velocity
-                        .xz()
-                        .angle_to(Vector2D::new(0.0, 1.0))
-                        .to_f32()
-                        .to_degrees();
+                    if !args.no_yaw {
+                        let yaw = self
+                            .velocity
+                            .xz()
+                            .angle_to(Vector2D::new(0.0, 1.0))
+                            .to_f32()
+                            .to_degrees();
 
-                    // TODO: Send a variety of move packets
-                    let move_packet = PositionRotationPacket {
-                        x: self.position.x,
-                        y: self.position.y,
-                        z: self.position.z,
-                        yaw,
-                        pitch: 0.0,
-                        on_ground: false,
-                    };
+                        let move_packet = PositionRotationPacket {
+                            x: self.position.x,
+                            y: self.position.y,
+                            z: self.position.z,
+                            yaw,
+                            pitch: 0.0,
+                            on_ground: false,
+                        };
 
-                    writer.write_packet(&move_packet)?;
+                        writer.write_packet(&move_packet)?;
+                    } else {
+                        let move_packet = PositionPacket {
+                            x: self.position.x,
+                            y: self.position.y,
+                            z: self.position.z,
+                            on_ground: false,
+                        };
+
+                        writer.write_packet(&move_packet)?;
+                    }
                 }
 
-                if !args.no_action && rand::random::<f64>() < 0.25 {
+                if !args.no_action && rand::random::<f64>() < args.action_chance {
                     let action: Action = rand::random();
                     match action {
                         Action::SendChat => {

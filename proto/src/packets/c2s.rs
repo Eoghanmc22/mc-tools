@@ -68,7 +68,9 @@ pub mod play {
             ChatMesssagePacket<'a> = 0x05,
             ClientSettingsPacket<'a> = 0x08,
             KeepAlivePacket = 0x12,
+            PositionPacket = 0x14,
             PositionRotationPacket = 0x15,
+            RotationPacket = 0x16,
             PlayerActionPacket = 0x1E,
             HeldSlotPacket = 0x28,
             AnimationPacket = 0x2F
