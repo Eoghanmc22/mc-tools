@@ -1,4 +1,4 @@
-# `mc-tools` (Name sudgestions welcome)
+# `mc-tools` (Name suggestions welcome)
 A collection of useful tools related to minecraft networking written in rust
 
 ## Crates
